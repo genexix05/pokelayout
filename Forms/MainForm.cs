@@ -53,6 +53,17 @@ public class MainForm : Form
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
 
+        // Cargar icono
+        try
+        {
+            var iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon.ico");
+            if (File.Exists(iconPath))
+            {
+                Icon = new Icon(iconPath);
+            }
+        }
+        catch { }
+
         // Panel lateral izquierdo (accent)
         _sidePanel = new Panel
         {
@@ -242,7 +253,7 @@ public class MainForm : Form
         _trayIcon = new NotifyIcon
         {
             Text = "PokeLayout",
-            Icon = SystemIcons.Application,
+            Icon = this.Icon ?? SystemIcons.Application,
             Visible = true
         };
 
@@ -483,6 +494,11 @@ public class MainForm : Form
                 case "/script.js":
                     response.ContentType = "application/javascript; charset=utf-8";
                     buffer = await GetStaticFileAsync("script.js");
+                    break;
+
+                case "/favicon.ico":
+                    response.ContentType = "image/x-icon";
+                    buffer = await GetStaticFileAsync("favicon.ico");
                     break;
 
                 case "/api/team":
