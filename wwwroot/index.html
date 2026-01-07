@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PokeLayout</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Press+Start+2P&family=VT323&family=Roboto:wght@400;500;700&family=Montserrat:wght@400;500;600;700&family=Open+Sans:wght@400;500;600;700&family=Lato:wght@400;700&family=Oswald:wght@400;500;600;700&family=Raleway:wght@400;500;600;700&family=Ubuntu:wght@400;500;700&family=Nunito:wght@400;500;600;700&family=Quicksand:wght@400;500;600;700&family=Comfortaa:wght@400;500;600;700&family=Righteous&family=Bangers&family=Bebas+Neue&family=Russo+One&family=Teko:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700&family=Exo+2:wght@400;500;600;700&family=Audiowide&family=Bungee&family=Fredoka:wght@400;500;600;700&family=Lexend:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=Sora:wght@400;500;600;700&family=Rubik:wght@400;500;600;700&family=Work+Sans:wght@400;500;600;700&family=Barlow:wght@400;500;600;700&family=Kanit:wght@400;500;600;700&family=Titillium+Web:wght@400;600;700&family=Chakra+Petch:wght@400;500;600;700&family=Play:wght@400;700&family=Share+Tech+Mono&family=Silkscreen&family=Pixelify+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Panel de configuración -->
+    <div class="config-panel" id="configPanel">
+        <div class="config-header">
+            <span>⚙️ Configuración</span>
+            <button class="config-toggle" id="toggleConfig">−</button>
+        </div>
+        <div class="config-body" id="configBody">
+            <!-- Layout -->
+            <div class="config-group">
+                <label>Layout</label>
+                <div class="config-buttons">
+                    <button class="config-btn active" data-layout="horizontal">Horizontal</button>
+                    <button class="config-btn" data-layout="vertical">Vertical</button>
+                </div>
+            </div>
+
+            <!-- Tipo de Sprite -->
+            <div class="config-group">
+                <label>Tipo de Sprite</label>
+                <select id="spriteType" class="config-select">
+                    <option value="default">Pixel (Default)</option>
+                    <option value="official">Official Artwork</option>
+                    <option value="home">Pokémon HOME</option>
+                    <option value="showdown">Showdown (Animado)</option>
+                    <option value="dream">Dream World</option>
+                    <option value="back">Pixel (Espalda)</option>
+                </select>
+            </div>
+
+            <!-- Mostrar -->
+            <div class="config-group">
+                <label>Mostrar</label>
+                <div class="config-checkboxes">
+                    <label><input type="checkbox" id="showNickname" checked> Nombre</label>
+                    <label><input type="checkbox" id="showLevel" checked> Nivel</label>
+                    <label><input type="checkbox" id="showHP"> Barra HP</label>
+                    <label><input type="checkbox" id="showShiny" checked> Shiny ✨</label>
+                </div>
+            </div>
+
+            <!-- Tamaños -->
+            <div class="config-group">
+                <label>Espaciado: <input type="number" id="spacingInput" value="8" min="0" class="config-number">px</label>
+                <input type="range" id="spacing" min="0" max="100" value="8">
+            </div>
+
+            <div class="config-group">
+                <label>Tamaño sprite: <input type="number" id="spriteSizeInput" value="48" min="16" class="config-number">px</label>
+                <input type="range" id="spriteSize" min="16" max="200" value="48">
+            </div>
+
+            <!-- Fuente -->
+            <div class="config-group">
+                <label>Fuente</label>
+                <select id="fontFamily" class="config-select">
+                    <optgroup label="── Modernas ──">
+                        <option value="Inter">Inter</option>
+                        <option value="Poppins">Poppins</option>
+                        <option value="Montserrat">Montserrat</option>
+                        <option value="Roboto">Roboto</option>
+                        <option value="Open Sans">Open Sans</option>
+                        <option value="Lato">Lato</option>
+                        <option value="Nunito">Nunito</option>
+                        <option value="Quicksand">Quicksand</option>
+                        <option value="Lexend">Lexend</option>
+                        <option value="DM Sans">DM Sans</option>
+                        <option value="Outfit">Outfit</option>
+                        <option value="Sora">Sora</option>
+                        <option value="Work Sans">Work Sans</option>
+                        <option value="Barlow">Barlow</option>
+                    </optgroup>
+                    <optgroup label="── Geométricas ──">
+                        <option value="Raleway">Raleway</option>
+                        <option value="Ubuntu">Ubuntu</option>
+                        <option value="Rubik">Rubik</option>
+                        <option value="Space Grotesk">Space Grotesk</option>
+                        <option value="Comfortaa">Comfortaa</option>
+                        <option value="Fredoka">Fredoka</option>
+                    </optgroup>
+                    <optgroup label="── Gaming / Futuristas ──">
+                        <option value="Orbitron">Orbitron</option>
+                        <option value="Exo 2">Exo 2</option>
+                        <option value="Audiowide">Audiowide</option>
+                        <option value="Teko">Teko</option>
+                        <option value="Oswald">Oswald</option>
+                        <option value="Kanit">Kanit</option>
+                        <option value="Titillium Web">Titillium Web</option>
+                        <option value="Chakra Petch">Chakra Petch</option>
+                        <option value="Play">Play</option>
+                    </optgroup>
+                    <optgroup label="── Display / Impacto ──">
+                        <option value="Bebas Neue">Bebas Neue</option>
+                        <option value="Russo One">Russo One</option>
+                        <option value="Righteous">Righteous</option>
+                        <option value="Bangers">Bangers</option>
+                        <option value="Bungee">Bungee</option>
+                    </optgroup>
+                    <optgroup label="── Pixel / Retro ──">
+                        <option value="Press Start 2P">Press Start 2P</option>
+                        <option value="VT323">VT323</option>
+                        <option value="Silkscreen">Silkscreen</option>
+                        <option value="Pixelify Sans">Pixelify Sans</option>
+                        <option value="Share Tech Mono">Share Tech Mono</option>
+                    </optgroup>
+                </select>
+            </div>
+
+            <div class="config-group">
+                <label>Tamaño texto: <input type="number" id="fontSizeInput" value="11" min="8" class="config-number">px</label>
+                <input type="range" id="fontSize" min="8" max="32" value="11">
+            </div>
+
+            <!-- Colores -->
+            <div class="config-group">
+                <label>Colores</label>
+                <div class="color-grid">
+                    <div class="color-item">
+                        <span>Nombre</span>
+                        <input type="color" id="colorName" value="#f8fafc">
+                    </div>
+                    <div class="color-item">
+                        <span>Mote</span>
+                        <input type="color" id="colorNickname" value="#fbbf24">
+                    </div>
+                    <div class="color-item">
+                        <span>Nivel</span>
+                        <input type="color" id="colorLevel" value="#94a3b8">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Borde de texto -->
+            <div class="config-group">
+                <label><input type="checkbox" id="textStroke"> Borde en texto</label>
+                <div class="stroke-options" id="strokeOptions">
+                    <div class="stroke-row">
+                        <span>Color</span>
+                        <input type="color" id="strokeColor" value="#000000">
+                    </div>
+                    <div class="stroke-row">
+                        <span>Grosor: <input type="number" id="strokeWidthInput" value="2" min="1" max="10" class="config-number-small">px</span>
+                        <input type="range" id="strokeWidth" min="1" max="10" value="2">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fondo -->
+            <div class="config-group">
+                <label>Fondo</label>
+                <div class="config-buttons">
+                    <button class="config-btn bg-btn active" data-bg="transparent">Transparente</button>
+                    <button class="config-btn bg-btn" data-bg="dark">Oscuro</button>
+                    <button class="config-btn bg-btn" data-bg="glass">Cristal</button>
+                </div>
+            </div>
+            
+            <!-- URL para OBS -->
+            <div class="config-group obs-url-group">
+                <label>URL para OBS</label>
+                <div class="obs-url-container">
+                    <input type="text" id="obsUrl" readonly value="http://localhost:5051/?obs">
+                    <button class="copy-url-btn" id="copyUrlBtn">📋 Copiar</button>
+                </div>
+                <span class="obs-hint">Pega esta URL en OBS como Browser Source</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenedor del equipo -->
+    <div class="team-wrapper" id="teamWrapper">
+        <div class="team-container horizontal" id="team">
+            <div class="loading-state">
+                <span>Esperando datos...</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+# Build results
+bin/
+obj/
+dist/
+publish/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Rider
+.idea/
+
+# Logs
+*.log
+
+# OS
+Thumbs.db
+.DS_Store
+
