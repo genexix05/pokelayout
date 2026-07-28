@@ -463,7 +463,7 @@ public class MainForm : Form
         var response = context.Response;
 
         response.Headers.Add("Access-Control-Allow-Origin", "*");
-        response.Headers.Add("Access-Control-Allow-Methods", "GET, OPTIONS");
+        response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
         response.Headers.Add("Access-Control-Allow-Headers", "*");
 
         if (request.HttpMethod == "OPTIONS")
@@ -478,6 +478,41 @@ public class MainForm : Form
 
         try
         {
+            if (path.StartsWith("/fonts/", StringComparison.OrdinalIgnoreCase) &&
+                request.HttpMethod == "GET")
+            {
+                await ServeCustomFontAsync(context, path["/fonts/".Length..]);
+                return;
+            }
+
+            if (path.Equals("/api/fonts", StringComparison.OrdinalIgnoreCase))
+            {
+                if (request.HttpMethod == "GET")
+                {
+                    response.ContentType = "application/json; charset=utf-8";
+                    buffer = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(ListCustomFonts(), new JsonSerializerOptions
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                    }));
+                    response.ContentLength64 = buffer.Length;
+                    await response.OutputStream.WriteAsync(buffer);
+                    return;
+                }
+
+                if (request.HttpMethod == "POST")
+                {
+                    await HandleFontUploadAsync(context);
+                    return;
+                }
+            }
+
+            if (path.StartsWith("/api/fonts/", StringComparison.OrdinalIgnoreCase) &&
+                request.HttpMethod == "DELETE")
+            {
+                await HandleFontDeleteAsync(context, path["/api/fonts/".Length..]);
+                return;
+            }
+
             switch (path)
             {
                 case "/":
@@ -523,6 +558,189 @@ public class MainForm : Form
         }
         catch { response.StatusCode = 500; }
         finally { response.Close(); }
+    }
+
+    private static string GetCustomFontsDirectory()
+    {
+        var dir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "custom-fonts");
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    private static readonly HashSet<string> AllowedFontExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".ttf", ".otf", ".woff", ".woff2"
+    };
+
+    private sealed class FontInfo
+    {
+        public string Family { get; set; } = "";
+        public string FileName { get; set; } = "";
+    }
+
+    private sealed class FontUploadRequest
+    {
+        public string? Family { get; set; }
+        public string? FileName { get; set; }
+        public string? Data { get; set; }
+    }
+
+    private static List<FontInfo> ListCustomFonts()
+    {
+        var dir = GetCustomFontsDirectory();
+        return Directory.GetFiles(dir)
+            .Where(f => AllowedFontExtensions.Contains(Path.GetExtension(f)))
+            .Select(f =>
+            {
+                var fileName = Path.GetFileName(f);
+                return new FontInfo
+                {
+                    FileName = fileName,
+                    Family = Path.GetFileNameWithoutExtension(fileName)
+                };
+            })
+            .OrderBy(f => f.Family, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string SanitizeFileName(string name)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        var cleaned = new string(name.Where(c => !invalid.Contains(c)).ToArray()).Trim();
+        if (string.IsNullOrWhiteSpace(cleaned)) cleaned = "custom-font.ttf";
+        return cleaned;
+    }
+
+    private static string SanitizeFamily(string? family, string fileName)
+    {
+        var baseName = string.IsNullOrWhiteSpace(family)
+            ? Path.GetFileNameWithoutExtension(fileName)
+            : family.Trim();
+        baseName = new string(baseName.Where(c => char.IsLetterOrDigit(c) || c is ' ' or '-' or '_').ToArray()).Trim();
+        return string.IsNullOrWhiteSpace(baseName) ? "CustomFont" : baseName;
+    }
+
+    private async Task HandleFontUploadAsync(HttpListenerContext context)
+    {
+        var response = context.Response;
+        using var reader = new StreamReader(context.Request.InputStream, context.Request.ContentEncoding);
+        var body = await reader.ReadToEndAsync();
+        var req = JsonSerializer.Deserialize<FontUploadRequest>(body, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+
+        if (req?.Data == null || string.IsNullOrWhiteSpace(req.Data))
+        {
+            response.StatusCode = 400;
+            var err = Encoding.UTF8.GetBytes("Falta el contenido de la fuente");
+            response.ContentLength64 = err.Length;
+            await response.OutputStream.WriteAsync(err);
+            return;
+        }
+
+        var rawName = SanitizeFileName(req.FileName ?? "font.ttf");
+        var ext = Path.GetExtension(rawName);
+        if (!AllowedFontExtensions.Contains(ext))
+        {
+            response.StatusCode = 400;
+            var err = Encoding.UTF8.GetBytes("Extensión no permitida");
+            response.ContentLength64 = err.Length;
+            await response.OutputStream.WriteAsync(err);
+            return;
+        }
+
+        byte[] bytes;
+        try
+        {
+            bytes = Convert.FromBase64String(req.Data);
+        }
+        catch
+        {
+            response.StatusCode = 400;
+            var err = Encoding.UTF8.GetBytes("Base64 inválido");
+            response.ContentLength64 = err.Length;
+            await response.OutputStream.WriteAsync(err);
+            return;
+        }
+
+        if (bytes.Length > 8 * 1024 * 1024)
+        {
+            response.StatusCode = 400;
+            var err = Encoding.UTF8.GetBytes("Fuente demasiado grande");
+            response.ContentLength64 = err.Length;
+            await response.OutputStream.WriteAsync(err);
+            return;
+        }
+
+        var family = SanitizeFamily(req.Family, rawName);
+        var safeFileName = SanitizeFileName(family + ext);
+        var path = Path.Combine(GetCustomFontsDirectory(), safeFileName);
+        await File.WriteAllBytesAsync(path, bytes);
+
+        var info = new FontInfo { Family = family, FileName = safeFileName };
+        var json = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(info, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        }));
+        response.ContentType = "application/json; charset=utf-8";
+        response.StatusCode = 200;
+        response.ContentLength64 = json.Length;
+        await response.OutputStream.WriteAsync(json);
+    }
+
+    private async Task HandleFontDeleteAsync(HttpListenerContext context, string fileName)
+    {
+        var response = context.Response;
+        fileName = Uri.UnescapeDataString(fileName);
+        fileName = Path.GetFileName(fileName); // evita path traversal
+        var path = Path.Combine(GetCustomFontsDirectory(), fileName);
+
+        if (!File.Exists(path) || !AllowedFontExtensions.Contains(Path.GetExtension(path)))
+        {
+            response.StatusCode = 404;
+            var err = Encoding.UTF8.GetBytes("Fuente no encontrada");
+            response.ContentLength64 = err.Length;
+            await response.OutputStream.WriteAsync(err);
+            return;
+        }
+
+        File.Delete(path);
+        response.StatusCode = 200;
+        var ok = Encoding.UTF8.GetBytes("{\"ok\":true}");
+        response.ContentType = "application/json; charset=utf-8";
+        response.ContentLength64 = ok.Length;
+        await response.OutputStream.WriteAsync(ok);
+    }
+
+    private async Task ServeCustomFontAsync(HttpListenerContext context, string fileName)
+    {
+        var response = context.Response;
+        fileName = Uri.UnescapeDataString(fileName);
+        fileName = Path.GetFileName(fileName);
+        var path = Path.Combine(GetCustomFontsDirectory(), fileName);
+
+        if (!File.Exists(path) || !AllowedFontExtensions.Contains(Path.GetExtension(path)))
+        {
+            response.StatusCode = 404;
+            var err = Encoding.UTF8.GetBytes("Not Found");
+            response.ContentLength64 = err.Length;
+            await response.OutputStream.WriteAsync(err);
+            return;
+        }
+
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        response.ContentType = ext switch
+        {
+            ".woff2" => "font/woff2",
+            ".woff" => "font/woff",
+            ".otf" => "font/otf",
+            _ => "font/ttf"
+        };
+        response.Headers.Add("Cache-Control", "public, max-age=31536000");
+        var bytes = await File.ReadAllBytesAsync(path);
+        response.ContentLength64 = bytes.Length;
+        await response.OutputStream.WriteAsync(bytes);
     }
 
     private static async Task<byte[]> GetStaticFileAsync(string filename)

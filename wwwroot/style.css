@@ -5,6 +5,7 @@
 :root {
     --spacing: 8px;
     --sprite-size: 48px;
+    --sprite-fx-pad: 8px;
     --font-family: 'Inter', sans-serif;
     --font-size: 11px;
     --color-name: #f8fafc;
@@ -250,7 +251,45 @@ input[type="range"]::-webkit-slider-thumb {
     border-radius: 4px;
 }
 
-/* Stroke options */
+.font-import-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    align-items: center;
+}
+
+.font-import-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 12px;
+    background: rgba(99, 102, 241, 0.2);
+    border: 1px solid rgba(99, 102, 241, 0.4);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 11px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.font-import-btn:hover {
+    background: rgba(99, 102, 241, 0.35);
+}
+
+.font-delete-btn {
+    padding: 6px 10px;
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    border-radius: 6px;
+    color: #fca5a5;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.font-delete-btn:hover {
+    background: rgba(239, 68, 68, 0.35);
+}
+
+/* Stroke / effect options panels */
 .stroke-options {
     display: none;
     flex-direction: column;
@@ -294,7 +333,7 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 .config-number-small {
-    width: 40px;
+    width: 48px;
     padding: 2px 4px;
     background: rgba(0,0,0,0.3);
     border: 1px solid rgba(255,255,255,0.1);
@@ -362,6 +401,7 @@ input[type="range"]::-webkit-slider-thumb {
 
 .team-wrapper {
     padding: 10px;
+    overflow: visible;
 }
 
 .team-wrapper.bg-dark {
@@ -377,6 +417,7 @@ input[type="range"]::-webkit-slider-thumb {
     display: flex;
     gap: var(--spacing);
     font-family: var(--font-family);
+    overflow: visible;
 }
 
 /* Layout: Horizontal */
@@ -411,6 +452,31 @@ input[type="range"]::-webkit-slider-thumb {
 
 .pokemon-card {
     position: relative;
+    overflow: visible;
+}
+
+/* Caja más grande que el sprite: deja aire para contorno y sombra */
+.pokemon-sprite-stack {
+    position: relative;
+    width: calc(var(--sprite-size) + var(--sprite-fx-pad) * 2);
+    height: calc(var(--sprite-size) + var(--sprite-fx-pad) * 2);
+    flex-shrink: 0;
+    overflow: visible;
+}
+
+.pokemon-sprite-stack .pokemon-sprite {
+    display: block;
+    position: absolute;
+    left: var(--sprite-fx-pad);
+    top: var(--sprite-fx-pad);
+    width: var(--sprite-size);
+    height: var(--sprite-size);
+    z-index: 1;
+}
+
+.pokemon-sprite-stack .sprite-shadow-layer {
+    z-index: 0;
+    pointer-events: none;
 }
 
 .pokemon-sprite {
@@ -425,16 +491,14 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 .pokemon-sprite.shiny {
-    filter: drop-shadow(0 0 4px #fbbf24);
+    /* El brillo shiny ahora se combina en buildSpriteFilter() */
 }
 
 .pokemon-sprite.fainted {
-    filter: grayscale(100%);
     opacity: 0.6;
 }
 
 .pokemon-sprite.fainted.shiny {
-    filter: grayscale(100%) drop-shadow(0 0 4px #888);
     opacity: 0.6;
 }
 
@@ -445,6 +509,7 @@ input[type="range"]::-webkit-slider-thumb {
     text-align: center;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-shadow: var(--text-fx-shadow, none);
 }
 
 .pokemon-name.nickname {
@@ -452,32 +517,16 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 .pokemon-name.has-stroke {
-    text-shadow: 
-        calc(var(--stroke-width) * -1) calc(var(--stroke-width) * -1) 0 var(--stroke-color),
-        var(--stroke-width) calc(var(--stroke-width) * -1) 0 var(--stroke-color),
-        calc(var(--stroke-width) * -1) var(--stroke-width) 0 var(--stroke-color),
-        var(--stroke-width) var(--stroke-width) 0 var(--stroke-color),
-        0 calc(var(--stroke-width) * -1) 0 var(--stroke-color),
-        0 var(--stroke-width) 0 var(--stroke-color),
-        calc(var(--stroke-width) * -1) 0 0 var(--stroke-color),
-        var(--stroke-width) 0 0 var(--stroke-color);
+    /* Contorno + sombra combinados en --text-fx-shadow */
 }
 
 .pokemon-level.has-stroke {
-    text-shadow: 
-        calc(var(--stroke-width) * -1) calc(var(--stroke-width) * -1) 0 var(--stroke-color),
-        var(--stroke-width) calc(var(--stroke-width) * -1) 0 var(--stroke-color),
-        calc(var(--stroke-width) * -1) var(--stroke-width) 0 var(--stroke-color),
-        var(--stroke-width) var(--stroke-width) 0 var(--stroke-color),
-        0 calc(var(--stroke-width) * -1) 0 var(--stroke-color),
-        0 var(--stroke-width) 0 var(--stroke-color),
-        calc(var(--stroke-width) * -1) 0 0 var(--stroke-color),
-        var(--stroke-width) 0 0 var(--stroke-color);
 }
 
 .pokemon-level {
     font-size: calc(var(--font-size) - 1px);
     color: var(--color-level);
+    text-shadow: var(--text-fx-shadow, none);
 }
 
 .shiny-icon {

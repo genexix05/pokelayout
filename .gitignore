@@ -23,6 +23,9 @@ release/
 _SmokeTest/
 _parse_rxdata.py
 
+# User-imported fonts (runtime)
+custom-fonts/
+
 # OS
 Thumbs.db
 .DS_Store

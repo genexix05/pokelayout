@@ -6,6 +6,7 @@ const REFRESH_INTERVAL = 2000;
 const API_URL = '/api/team';
 
 let currentTeam = null;
+let customFonts = []; // { family, fileName }
 let config = {
     layout: 'horizontal',
     spriteType: 'default',
@@ -23,6 +24,19 @@ let config = {
     textStroke: false,
     strokeColor: '#000000',
     strokeWidth: 2,
+    textShadow: false,
+    textShadowColor: '#000000',
+    textShadowX: 1,
+    textShadowY: 1,
+    textShadowBlur: 3,
+    spriteShadow: false,
+    spriteShadowColor: '#000000',
+    spriteShadowX: 2,
+    spriteShadowY: 2,
+    spriteShadowBlur: 4,
+    spriteStroke: false,
+    spriteStrokeColor: '#000000',
+    spriteStrokeWidth: 2,
     background: 'transparent'
 };
 
@@ -102,6 +116,19 @@ function generateOBSUrl() {
     params.set('stroke', config.textStroke ? '1' : '0');
     params.set('strokec', config.strokeColor.replace('#', ''));
     params.set('strokew', config.strokeWidth);
+    params.set('tshadow', config.textShadow ? '1' : '0');
+    params.set('tsc', config.textShadowColor.replace('#', ''));
+    params.set('tsx', config.textShadowX);
+    params.set('tsy', config.textShadowY);
+    params.set('tsb', config.textShadowBlur);
+    params.set('sshadow', config.spriteShadow ? '1' : '0');
+    params.set('ssc', config.spriteShadowColor.replace('#', ''));
+    params.set('ssx', config.spriteShadowX);
+    params.set('ssy', config.spriteShadowY);
+    params.set('ssb', config.spriteShadowBlur);
+    params.set('sstroke', config.spriteStroke ? '1' : '0');
+    params.set('sstrokec', config.spriteStrokeColor.replace('#', ''));
+    params.set('sstrokew', config.spriteStrokeWidth);
     return window.location.origin + '/?obs&' + params.toString();
 }
 
@@ -128,7 +155,20 @@ function loadConfigFromURL() {
     if (p.has('shiny')) config.showShiny = p.get('shiny') === '1';
     if (p.has('stroke')) config.textStroke = p.get('stroke') === '1';
     if (p.has('strokec')) config.strokeColor = '#' + p.get('strokec');
-    if (p.has('strokew')) config.strokeWidth = parseInt(p.get('strokew')) || 2;
+    if (p.has('strokew')) config.strokeWidth = parseFloat(p.get('strokew')) || 2;
+    if (p.has('tshadow')) config.textShadow = p.get('tshadow') === '1';
+    if (p.has('tsc')) config.textShadowColor = '#' + p.get('tsc');
+    if (p.has('tsx')) config.textShadowX = parseInt(p.get('tsx')) || 0;
+    if (p.has('tsy')) config.textShadowY = parseInt(p.get('tsy')) || 0;
+    if (p.has('tsb')) config.textShadowBlur = parseInt(p.get('tsb')) || 0;
+    if (p.has('sshadow')) config.spriteShadow = p.get('sshadow') === '1';
+    if (p.has('ssc')) config.spriteShadowColor = '#' + p.get('ssc');
+    if (p.has('ssx')) config.spriteShadowX = parseInt(p.get('ssx')) || 0;
+    if (p.has('ssy')) config.spriteShadowY = parseInt(p.get('ssy')) || 0;
+    if (p.has('ssb')) config.spriteShadowBlur = parseInt(p.get('ssb')) || 0;
+    if (p.has('sstroke')) config.spriteStroke = p.get('sstroke') === '1';
+    if (p.has('sstrokec')) config.spriteStrokeColor = '#' + p.get('sstrokec');
+    if (p.has('sstrokew')) config.spriteStrokeWidth = parseFloat(p.get('sstrokew')) || 2;
 }
 
 function loadConfig() {
@@ -147,13 +187,133 @@ function saveConfig() {
     updateOBSUrlField();
 }
 
+function buildTextFxShadow() {
+    const parts = [];
+    if (config.textStroke) {
+        const w = config.strokeWidth;
+        const c = config.strokeColor;
+        // Contorno fino: 8 direcciones (texto no anima, drop-shadow va bien)
+        for (const [x, y] of [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]]) {
+            parts.push(`${x * w}px ${y * w}px 0 ${c}`);
+        }
+    }
+    if (config.textShadow) {
+        parts.push(`${config.textShadowX}px ${config.textShadowY}px ${config.textShadowBlur}px ${config.textShadowColor}`);
+    }
+    return parts.length ? parts.join(', ') : 'none';
+}
+
+/** SVG: solo contorno (sobre el sprite principal). La sombra va en capa aparte. */
+function updateSpriteSvgFilter() {
+    const ns = 'http://www.w3.org/2000/svg';
+    const el = (name, attrs = {}) => {
+        const node = document.createElementNS(ns, name);
+        for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v));
+        return node;
+    };
+    const fill = (filterEl, build) => {
+        if (!filterEl) return;
+        while (filterEl.firstChild) filterEl.removeChild(filterEl.firstChild);
+        build(filterEl);
+    };
+
+    // Contorno dilatado (sigue el alfa frame a frame en GIFs)
+    fill(document.getElementById('spriteStrokeFilter'), filter => {
+        if (!config.spriteStroke) {
+            const merge = el('feMerge');
+            merge.appendChild(el('feMergeNode', { in: 'SourceGraphic' }));
+            filter.appendChild(merge);
+            return;
+        }
+        const radius = Math.max(0.25, Number(config.spriteStrokeWidth) || 0.25);
+        filter.appendChild(el('feMorphology', {
+            in: 'SourceAlpha', operator: 'dilate', radius, result: 'dilated'
+        }));
+        filter.appendChild(el('feFlood', {
+            'flood-color': config.spriteStrokeColor || '#000000', result: 'flood'
+        }));
+        filter.appendChild(el('feComposite', {
+            in: 'flood', in2: 'dilated', operator: 'in', result: 'outline'
+        }));
+        const merge = el('feMerge');
+        merge.appendChild(el('feMergeNode', { in: 'outline' }));
+        merge.appendChild(el('feMergeNode', { in: 'SourceGraphic' }));
+        filter.appendChild(merge);
+    });
+
+    // Sombra desde SourceAlpha (se aplica a una capa-img duplicada)
+    fill(document.getElementById('spriteShadowFilter'), filter => {
+        const blur = Math.max(0, Number(config.spriteShadowBlur) || 0) / 2;
+        const dx = Number(config.spriteShadowX) || 0;
+        const dy = Number(config.spriteShadowY) || 0;
+        filter.appendChild(el('feOffset', {
+            in: 'SourceAlpha', dx, dy, result: 'off'
+        }));
+        filter.appendChild(el('feGaussianBlur', {
+            in: 'off', stdDeviation: blur > 0 ? blur : 0, result: 'blur'
+        }));
+        filter.appendChild(el('feFlood', {
+            'flood-color': config.spriteShadowColor || '#000000',
+            'flood-opacity': '0.85',
+            result: 'flood'
+        }));
+        filter.appendChild(el('feComposite', {
+            in: 'flood', in2: 'blur', operator: 'in'
+        }));
+    });
+
+    // CSS vars por si se usa capa con translate (fallback)
+    const root = document.documentElement;
+    root.style.setProperty('--sprite-shadow-x', (config.spriteShadowX || 0) + 'px');
+    root.style.setProperty('--sprite-shadow-y', (config.spriteShadowY || 0) + 'px');
+    root.style.setProperty('--sprite-shadow-blur', (config.spriteShadowBlur || 0) + 'px');
+    root.style.setProperty('--sprite-shadow-color', config.spriteShadowColor || '#000000');
+}
+
+function buildSpriteFilter(isShiny, isFainted) {
+    const parts = [];
+
+    // Solo contorno en el sprite principal (la sombra es otra <img>)
+    if (config.spriteStroke) {
+        parts.push('url(#spriteStrokeFilter)');
+    }
+
+    if (isFainted) parts.push('grayscale(100%)');
+
+    if (isShiny && config.showShiny) {
+        parts.push(isFainted ? 'drop-shadow(0 0 4px #888)' : 'drop-shadow(0 0 4px #fbbf24)');
+    }
+
+    return parts.length ? parts.join(' ') : 'none';
+}
+
+function buildImgErrorHandler(fallbackUrl, fallback2) {
+    return `if(this.dataset.fb!=='1'){this.dataset.fb='1';this.src='${fallbackUrl}';}else if(this.dataset.fb!=='2'){this.dataset.fb='2';this.src='${fallback2}';}else{this.onerror=null;this.src='${FALLBACK_SPRITE}';}`;
+}
+
+function getSpriteFxPadding() {
+    let pad = 4; // margen mínimo para que el sprite no toque el borde del box
+    if (config.spriteStroke) {
+        pad = Math.max(pad, (Number(config.spriteStrokeWidth) || 0) + 2);
+    }
+    if (config.spriteShadow) {
+        const sx = Math.abs(Number(config.spriteShadowX) || 0);
+        const sy = Math.abs(Number(config.spriteShadowY) || 0);
+        const blur = Number(config.spriteShadowBlur) || 0;
+        pad = Math.max(pad, sx + blur + 2, sy + blur + 2);
+    }
+    return Math.ceil(pad);
+}
+
 function applyConfig() {
     const root = document.documentElement;
     const container = document.getElementById('team');
     const wrapper = document.getElementById('teamWrapper');
+    const fxPad = getSpriteFxPadding();
     
     root.style.setProperty('--spacing', config.spacing + 'px');
     root.style.setProperty('--sprite-size', config.spriteSize + 'px');
+    root.style.setProperty('--sprite-fx-pad', fxPad + 'px');
     root.style.setProperty('--font-family', `'${config.fontFamily}', sans-serif`);
     root.style.setProperty('--font-size', config.fontSize + 'px');
     root.style.setProperty('--color-name', config.colorName);
@@ -161,6 +321,8 @@ function applyConfig() {
     root.style.setProperty('--color-level', config.colorLevel);
     root.style.setProperty('--stroke-color', config.strokeColor);
     root.style.setProperty('--stroke-width', config.strokeWidth + 'px');
+    root.style.setProperty('--text-fx-shadow', buildTextFxShadow());
+    updateSpriteSvgFilter();
     
     container.className = 'team-container ' + config.layout;
     
@@ -198,17 +360,41 @@ function applyConfig() {
         if (el('strokeColor')) el('strokeColor').value = config.strokeColor;
         if (el('strokeWidth')) el('strokeWidth').value = config.strokeWidth;
         if (el('strokeWidthInput')) el('strokeWidthInput').value = config.strokeWidth;
-        
-        // Toggle stroke options visibility
-        const strokeOptions = el('strokeOptions');
-        if (strokeOptions) {
-            strokeOptions.classList.toggle('visible', config.textStroke);
-        }
-        
+        if (el('textShadow')) el('textShadow').checked = config.textShadow;
+        if (el('textShadowColor')) el('textShadowColor').value = config.textShadowColor;
+        if (el('textShadowX')) el('textShadowX').value = config.textShadowX;
+        if (el('textShadowXInput')) el('textShadowXInput').value = config.textShadowX;
+        if (el('textShadowY')) el('textShadowY').value = config.textShadowY;
+        if (el('textShadowYInput')) el('textShadowYInput').value = config.textShadowY;
+        if (el('textShadowBlur')) el('textShadowBlur').value = config.textShadowBlur;
+        if (el('textShadowBlurInput')) el('textShadowBlurInput').value = config.textShadowBlur;
+        if (el('spriteShadow')) el('spriteShadow').checked = config.spriteShadow;
+        if (el('spriteShadowColor')) el('spriteShadowColor').value = config.spriteShadowColor;
+        if (el('spriteShadowX')) el('spriteShadowX').value = config.spriteShadowX;
+        if (el('spriteShadowXInput')) el('spriteShadowXInput').value = config.spriteShadowX;
+        if (el('spriteShadowY')) el('spriteShadowY').value = config.spriteShadowY;
+        if (el('spriteShadowYInput')) el('spriteShadowYInput').value = config.spriteShadowY;
+        if (el('spriteShadowBlur')) el('spriteShadowBlur').value = config.spriteShadowBlur;
+        if (el('spriteShadowBlurInput')) el('spriteShadowBlurInput').value = config.spriteShadowBlur;
+        if (el('spriteStroke')) el('spriteStroke').checked = config.spriteStroke;
+        if (el('spriteStrokeColor')) el('spriteStrokeColor').value = config.spriteStrokeColor;
+        if (el('spriteStrokeWidth')) el('spriteStrokeWidth').value = config.spriteStrokeWidth;
+        if (el('spriteStrokeWidthInput')) el('spriteStrokeWidthInput').value = config.spriteStrokeWidth;
+
+        toggleOptions('strokeOptions', config.textStroke);
+        toggleOptions('textShadowOptions', config.textShadow);
+        toggleOptions('spriteShadowOptions', config.spriteShadow);
+        toggleOptions('spriteStrokeOptions', config.spriteStroke);
+        updateDeleteFontButton();
         updateOBSUrlField();
     }
     
     if (currentTeam) renderTeam(currentTeam);
+}
+
+function toggleOptions(id, visible) {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('visible', !!visible);
 }
 
 function setupConfigListeners() {
@@ -255,6 +441,22 @@ function setupConfigListeners() {
     
     // Stroke width
     setupRangeInput('strokeWidth', 'strokeWidthInput', 'strokeWidth');
+
+    bindCheckbox('textShadow', 'textShadow');
+    bindColor('textShadowColor', 'textShadowColor');
+    setupRangeInput('textShadowX', 'textShadowXInput', 'textShadowX');
+    setupRangeInput('textShadowY', 'textShadowYInput', 'textShadowY');
+    setupRangeInput('textShadowBlur', 'textShadowBlurInput', 'textShadowBlur');
+
+    bindCheckbox('spriteShadow', 'spriteShadow');
+    bindColor('spriteShadowColor', 'spriteShadowColor');
+    setupRangeInput('spriteShadowX', 'spriteShadowXInput', 'spriteShadowX');
+    setupRangeInput('spriteShadowY', 'spriteShadowYInput', 'spriteShadowY');
+    setupRangeInput('spriteShadowBlur', 'spriteShadowBlurInput', 'spriteShadowBlur');
+
+    bindCheckbox('spriteStroke', 'spriteStroke');
+    bindColor('spriteStrokeColor', 'spriteStrokeColor');
+    setupRangeInput('spriteStrokeWidth', 'spriteStrokeWidthInput', 'spriteStrokeWidth');
     
     const spriteType = document.getElementById('spriteType');
     if (spriteType) spriteType.addEventListener('change', async e => {
@@ -268,7 +470,28 @@ function setupConfigListeners() {
     });
     
     const fontFamily = document.getElementById('fontFamily');
-    if (fontFamily) fontFamily.addEventListener('change', e => { config.fontFamily = e.target.value; saveConfig(); applyConfig(); });
+    if (fontFamily) fontFamily.addEventListener('change', e => {
+        config.fontFamily = e.target.value;
+        saveConfig();
+        applyConfig();
+        updateDeleteFontButton();
+    });
+
+    const fontFileInput = document.getElementById('fontFileInput');
+    if (fontFileInput) {
+        fontFileInput.addEventListener('change', async e => {
+            const file = e.target.files?.[0];
+            if (file) await importCustomFont(file);
+            e.target.value = '';
+        });
+    }
+
+    const deleteFontBtn = document.getElementById('deleteFontBtn');
+    if (deleteFontBtn) {
+        deleteFontBtn.addEventListener('click', async () => {
+            await deleteSelectedCustomFont();
+        });
+    }
     
     setupRangeInput('spacing', 'spacingInput', 'spacing');
     setupRangeInput('spriteSize', 'spriteSizeInput', 'spriteSize');
@@ -303,20 +526,185 @@ function setupConfigListeners() {
 function setupRangeInput(rangeId, inputId, configKey) {
     const range = document.getElementById(rangeId);
     const input = document.getElementById(inputId);
+    const step = parseFloat(range?.step || input?.step || '1');
+    const useFloat = step > 0 && step < 1;
+
+    const readValue = raw => {
+        const n = useFloat ? parseFloat(raw) : parseInt(raw, 10);
+        if (Number.isNaN(n)) return useFloat ? 0 : 0;
+        return useFloat ? Math.round(n * 100) / 100 : n;
+    };
     
     if (range) range.addEventListener('input', e => {
-        config[configKey] = parseInt(e.target.value);
+        config[configKey] = readValue(e.target.value);
         if (input) input.value = config[configKey];
         saveConfig();
         applyConfig();
     });
     
     if (input) input.addEventListener('change', e => {
-        config[configKey] = parseInt(e.target.value) || 0;
-        if (range) range.value = Math.min(range.max, Math.max(range.min, config[configKey]));
+        config[configKey] = readValue(e.target.value);
+        if (range) {
+            const min = parseFloat(range.min);
+            const max = parseFloat(range.max);
+            range.value = Math.min(max, Math.max(min, config[configKey]));
+            config[configKey] = readValue(range.value);
+            input.value = config[configKey];
+        }
         saveConfig();
         applyConfig();
     });
+}
+
+function bindCheckbox(id, key) {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', e => {
+        config[key] = e.target.checked;
+        saveConfig();
+        applyConfig();
+    });
+}
+
+function bindColor(id, key) {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', e => {
+        config[key] = e.target.value;
+        saveConfig();
+        applyConfig();
+    });
+}
+
+async function loadCustomFonts() {
+    try {
+        const res = await fetch('/api/fonts');
+        if (!res.ok) return;
+        customFonts = await res.json() || [];
+        refreshCustomFontOptions();
+        for (const font of customFonts) {
+            await registerFontFace(font.family, font.fileName);
+        }
+    } catch (e) {
+        console.warn('[Fonts] No se pudieron cargar fuentes custom', e);
+    }
+}
+
+function refreshCustomFontOptions() {
+    const group = document.getElementById('customFontsGroup');
+    const select = document.getElementById('fontFamily');
+    if (!group || !select) return;
+
+    group.innerHTML = '';
+    if (!customFonts.length) {
+        group.hidden = true;
+        return;
+    }
+
+    group.hidden = false;
+    for (const font of customFonts) {
+        const opt = document.createElement('option');
+        opt.value = font.family;
+        opt.textContent = font.family;
+        group.appendChild(opt);
+    }
+
+    // Restaurar selección si sigue existiendo
+    const exists = [...select.options].some(o => o.value === config.fontFamily);
+    if (exists) select.value = config.fontFamily;
+}
+
+async function registerFontFace(family, fileName) {
+    const url = `/fonts/${encodeURIComponent(fileName)}`;
+    try {
+        const face = new FontFace(family, `url(${url})`);
+        await face.load();
+        document.fonts.add(face);
+    } catch (e) {
+        // Fallback CSS @font-face
+        const styleId = `font-${family.replace(/\s+/g, '-')}`;
+        if (!document.getElementById(styleId)) {
+            const style = document.createElement('style');
+            style.id = styleId;
+            style.textContent = `@font-face{font-family:'${family}';src:url('${url}');font-display:swap;}`;
+            document.head.appendChild(style);
+        }
+    }
+}
+
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const result = String(reader.result || '');
+            const base64 = result.includes(',') ? result.split(',')[1] : result;
+            resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+function sanitizeFontFamily(name) {
+    return name.replace(/\.[^.]+$/, '').replace(/[^\w\s\-]/g, '').trim() || 'CustomFont';
+}
+
+async function importCustomFont(file) {
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    if (!['ttf', 'otf', 'woff', 'woff2'].includes(ext)) {
+        alert('Formato no soportado. Usa .ttf, .otf, .woff o .woff2');
+        return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+        alert('La fuente es demasiado grande (máx. 8 MB)');
+        return;
+    }
+
+    const family = sanitizeFontFamily(file.name);
+    const data = await fileToBase64(file);
+
+    try {
+        const res = await fetch('/api/fonts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ family, fileName: file.name, data })
+        });
+        if (!res.ok) {
+            const err = await res.text();
+            throw new Error(err || 'Error al subir fuente');
+        }
+        const saved = await res.json();
+        await registerFontFace(saved.family, saved.fileName);
+        await loadCustomFonts();
+        config.fontFamily = saved.family;
+        saveConfig();
+        applyConfig();
+    } catch (e) {
+        console.error(e);
+        alert('No se pudo importar la fuente. ¿Está PokeLayout en ejecución?');
+    }
+}
+
+function updateDeleteFontButton() {
+    const btn = document.getElementById('deleteFontBtn');
+    if (!btn) return;
+    const isCustom = customFonts.some(f => f.family === config.fontFamily);
+    btn.hidden = !isCustom;
+}
+
+async function deleteSelectedCustomFont() {
+    const font = customFonts.find(f => f.family === config.fontFamily);
+    if (!font) return;
+    if (!confirm(`¿Eliminar la fuente "${font.family}"?`)) return;
+
+    try {
+        const res = await fetch(`/api/fonts/${encodeURIComponent(font.fileName)}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('No se pudo eliminar');
+        config.fontFamily = 'Inter';
+        saveConfig();
+        await loadCustomFonts();
+        applyConfig();
+    } catch (e) {
+        alert('Error al eliminar la fuente');
+    }
 }
 
 function buildSpriteUrl(typeKey, id, shiny, female) {
@@ -439,8 +827,8 @@ function createPokemonCard(pokemon) {
     const spriteType = SPRITE_TYPES[config.spriteType] || SPRITE_TYPES.default;
     const isHighRes = !!spriteType.highRes;
     let spriteClass = 'pokemon-sprite' + (isHighRes ? ' high-res' : '') + (isShiny && config.showShiny ? ' shiny' : '') + (isFainted ? ' fainted' : '');
+    const spriteFilter = buildSpriteFilter(isShiny, isFainted);
     
-    // Classes for text with stroke
     let nameClass = 'pokemon-name' + (hasNickname ? ' nickname' : '') + (config.textStroke ? ' has-stroke' : '');
     let levelClass = 'pokemon-level' + (config.textStroke ? ' has-stroke' : '');
 
@@ -468,7 +856,16 @@ function createPokemonCard(pokemon) {
     
     let html = `<div class="pokemon-card">`;
     if (config.showShiny && isShiny) html += `<span class="shiny-icon">✨</span>`;
-    html += `<img src="${primaryUrl}" alt="${escapeHtml(pokemon.speciesName)}" class="${spriteClass}" data-fb2="${fallback2}" onerror="if(this.dataset.fb!=='1'){this.dataset.fb='1';this.src='${fallbackUrl}';}else if(this.dataset.fb!=='2'){this.dataset.fb='2';this.src=this.dataset.fb2;}else{this.onerror=null;this.src='${FALLBACK_SPRITE}';}">`;
+
+    const onErr = buildImgErrorHandler(fallbackUrl, fallback2);
+    html += `<div class="pokemon-sprite-stack">`;
+    // Capa de sombra: mismo GIF/PNG duplicado → la sombra sigue la silueta (no el rectángulo del <img>)
+    if (config.spriteShadow) {
+        html += `<img src="${primaryUrl}" alt="" class="pokemon-sprite sprite-shadow-layer${isHighRes ? ' high-res' : ''}${isFainted ? ' fainted' : ''}" style="filter:url(#spriteShadowFilter)" aria-hidden="true" draggable="false" onerror="${onErr}">`;
+    }
+    html += `<img src="${primaryUrl}" alt="${escapeHtml(pokemon.speciesName)}" class="${spriteClass}" style="filter:${spriteFilter}" data-fb2="${fallback2}" onerror="${onErr}">`;
+    html += `</div>`;
+
     if (config.showNickname) html += `<span class="${nameClass}">${escapeHtml(displayName)}</span>`;
     if (config.showLevel) html += `<span class="${levelClass}">Nv.${pokemon.level}</span>`;
     if (config.showHP) html += `<div class="hp-bar-container"><div class="hp-bar ${hp.cls}" style="width:${hp.pct}%"></div></div>`;
@@ -501,6 +898,7 @@ async function updateOverlay() {
 async function init() {
     if (isOBSMode()) document.body.classList.add('obs-mode');
     loadConfig();
+    await loadCustomFonts();
     if (!isOBSMode()) setupConfigListeners();
     applyConfig();
     await updateOverlay();

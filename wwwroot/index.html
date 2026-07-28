@@ -109,10 +109,48 @@
                 <input type="range" id="spriteSize" min="16" max="200" value="48">
             </div>
 
+            <!-- Efectos de sprite -->
+            <div class="config-group">
+                <label><input type="checkbox" id="spriteShadow"> Sombra en sprites</label>
+                <div class="stroke-options" id="spriteShadowOptions">
+                    <div class="stroke-row">
+                        <span>Color</span>
+                        <input type="color" id="spriteShadowColor" value="#000000">
+                    </div>
+                    <div class="stroke-row">
+                        <span>Desplazamiento X: <input type="number" id="spriteShadowXInput" value="2" min="-20" max="20" class="config-number-small">px</span>
+                        <input type="range" id="spriteShadowX" min="-20" max="20" value="2">
+                    </div>
+                    <div class="stroke-row">
+                        <span>Desplazamiento Y: <input type="number" id="spriteShadowYInput" value="2" min="-20" max="20" class="config-number-small">px</span>
+                        <input type="range" id="spriteShadowY" min="-20" max="20" value="2">
+                    </div>
+                    <div class="stroke-row">
+                        <span>Difuminado: <input type="number" id="spriteShadowBlurInput" value="4" min="0" max="30" class="config-number-small">px</span>
+                        <input type="range" id="spriteShadowBlur" min="0" max="30" value="4">
+                    </div>
+                </div>
+            </div>
+
+            <div class="config-group">
+                <label><input type="checkbox" id="spriteStroke"> Contorno en sprites</label>
+                <div class="stroke-options" id="spriteStrokeOptions">
+                    <div class="stroke-row">
+                        <span>Color</span>
+                        <input type="color" id="spriteStrokeColor" value="#000000">
+                    </div>
+                    <div class="stroke-row">
+                        <span>Grosor: <input type="number" id="spriteStrokeWidthInput" value="2" min="0.25" max="8" step="0.25" class="config-number-small">px</span>
+                        <input type="range" id="spriteStrokeWidth" min="0.25" max="8" step="0.25" value="2">
+                    </div>
+                </div>
+            </div>
+
             <!-- Fuente -->
             <div class="config-group">
                 <label>Fuente</label>
                 <select id="fontFamily" class="config-select">
+                    <optgroup id="customFontsGroup" label="── Tus fuentes ──" hidden></optgroup>
                     <optgroup label="── Modernas ──">
                         <option value="Inter">Inter</option>
                         <option value="Poppins">Poppins</option>
@@ -163,6 +201,12 @@
                         <option value="Share Tech Mono">Share Tech Mono</option>
                     </optgroup>
                 </select>
+                <div class="font-import-row">
+                    <label class="font-import-btn" for="fontFileInput">📁 Importar fuente</label>
+                    <input type="file" id="fontFileInput" accept=".ttf,.otf,.woff,.woff2" hidden>
+                    <button type="button" class="font-delete-btn" id="deleteFontBtn" title="Eliminar fuente seleccionada" hidden>🗑</button>
+                </div>
+                <span class="obs-hint">Importa .ttf / .otf / .woff de tu PC. Funciona también en OBS.</span>
             </div>
 
             <div class="config-group">
@@ -191,15 +235,38 @@
 
             <!-- Borde de texto -->
             <div class="config-group">
-                <label><input type="checkbox" id="textStroke"> Borde en texto</label>
+                <label><input type="checkbox" id="textStroke"> Contorno en texto</label>
                 <div class="stroke-options" id="strokeOptions">
                     <div class="stroke-row">
                         <span>Color</span>
                         <input type="color" id="strokeColor" value="#000000">
                     </div>
                     <div class="stroke-row">
-                        <span>Grosor: <input type="number" id="strokeWidthInput" value="2" min="1" max="10" class="config-number-small">px</span>
-                        <input type="range" id="strokeWidth" min="1" max="10" value="2">
+                        <span>Grosor: <input type="number" id="strokeWidthInput" value="2" min="0.25" max="10" step="0.25" class="config-number-small">px</span>
+                        <input type="range" id="strokeWidth" min="0.25" max="10" step="0.25" value="2">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sombra de texto -->
+            <div class="config-group">
+                <label><input type="checkbox" id="textShadow"> Sombra en texto</label>
+                <div class="stroke-options" id="textShadowOptions">
+                    <div class="stroke-row">
+                        <span>Color</span>
+                        <input type="color" id="textShadowColor" value="#000000">
+                    </div>
+                    <div class="stroke-row">
+                        <span>Desplazamiento X: <input type="number" id="textShadowXInput" value="1" min="-20" max="20" class="config-number-small">px</span>
+                        <input type="range" id="textShadowX" min="-20" max="20" value="1">
+                    </div>
+                    <div class="stroke-row">
+                        <span>Desplazamiento Y: <input type="number" id="textShadowYInput" value="1" min="-20" max="20" class="config-number-small">px</span>
+                        <input type="range" id="textShadowY" min="-20" max="20" value="1">
+                    </div>
+                    <div class="stroke-row">
+                        <span>Difuminado: <input type="number" id="textShadowBlurInput" value="3" min="0" max="30" class="config-number-small">px</span>
+                        <input type="range" id="textShadowBlur" min="0" max="30" value="3">
                     </div>
                 </div>
             </div>
@@ -225,6 +292,14 @@
             </div>
         </div>
     </div>
+
+    <!-- Filtros SVG para contorno/sombra de sprites (compatible con GIFs animados) -->
+    <svg id="spriteFxSvg" aria-hidden="true" width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden">
+        <defs>
+            <filter id="spriteStrokeFilter" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB"></filter>
+            <filter id="spriteShadowFilter" x="-120%" y="-120%" width="340%" height="340%" color-interpolation-filters="sRGB"></filter>
+        </defs>
+    </svg>
 
     <!-- Contenedor del equipo -->
     <div class="team-wrapper" id="teamWrapper">
