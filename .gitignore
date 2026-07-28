@@ -16,6 +16,13 @@ release/
 # Logs
 *.log
 
+# Local saves / temp tests
+*.rxdata
+*.rvdata
+*.rvdata2
+_SmokeTest/
+_parse_rxdata.py
+
 # OS
 Thumbs.db
 .DS_Store

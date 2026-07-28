@@ -349,7 +349,7 @@ public class MainForm : Form
         using var openFileDialog = new OpenFileDialog
         {
             Title = "Selecciona tu archivo de guardado",
-            Filter = "Archivos Save|*.sav;*.dsv;*.dat;*.gci;*.sa1;*.sa2|Todos los archivos|*.*",
+            Filter = "Archivos Save|*.sav;*.dsv;*.dat;*.gci;*.sa1;*.sa2;*.rxdata;*.rvdata;*.rvdata2|RPG Maker / Essentials|*.rxdata;*.rvdata;*.rvdata2|Todos los archivos|*.*",
             FilterIndex = 1
         };
 
