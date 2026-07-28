@@ -6,11 +6,9 @@
 
 Overlay leyendo un save de **Pokémon Essentials** (`.rxdata`) en tiempo real:
 
-https://github.com/genexix05/pokelayout/raw/main/pruebaessentials.mp4
+![Demo PokeLayout con Pokémon Essentials](media/demo-essentials.gif)
 
-<video src="pruebaessentials.mp4" controls width="720" poster="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png">
-  Tu navegador no reproduce vídeo embebido. <a href="pruebaessentials.mp4">Ver demo</a>
-</video>
+[▶️ Descargar / ver vídeo en MP4](media/demo-essentials.mp4)
 
 ## ✨ Características
 
