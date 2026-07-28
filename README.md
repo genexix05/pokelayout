@@ -2,7 +2,15 @@
 
 **Overlay de equipo Pokémon para OBS** — Muestra tu equipo en tiempo real mientras juegas y haces stream.
 
-![Preview](https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png)
+## 🎬 Demo
+
+Overlay leyendo un save de **Pokémon Essentials** (`.rxdata`) en tiempo real:
+
+https://github.com/genexix05/pokelayout/raw/main/pruebaessentials.mp4
+
+<video src="pruebaessentials.mp4" controls width="720" poster="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png">
+  Tu navegador no reproduce vídeo embebido. <a href="pruebaessentials.mp4">Ver demo</a>
+</video>
 
 ## ✨ Características
 
@@ -11,9 +19,9 @@
 - 🎨 **Totalmente personalizable**:
   - 2 layouts: Horizontal y Vertical
   - **~30 tipos de sprites** (PokeAPI por generación + PMD Collab)
-  - 35+ fuentes disponibles
+  - 35+ fuentes incluidas + **importar fuentes de tu PC** (`.ttf` / `.otf` / `.woff`)
   - Colores personalizables para nombres, motes y niveles
-  - Borde/contorno de texto configurable
+  - **Contorno y sombra** en texto y en sprites (compatible con GIFs animados)
   - Tamaño de sprites y espaciado ajustable
 - ✨ **Indicador de Shiny** con brillo especial
 - 💀 **Pokémon debilitados** se muestran en blanco y negro
@@ -33,7 +41,7 @@
 ## 📥 Descarga
 
 1. Ve a [**Releases**](https://github.com/genexix05/pokelayout/releases)
-2. Descarga `pokelayout-vX.X.zip`
+2. Descarga `pokelayout-v1.2.0.zip` (o la última versión)
 3. Extrae **toda la carpeta** (no solo el `.exe`)
 4. Ejecuta `pokelayout.exe`
 
@@ -58,14 +66,14 @@ Abre `pokelayout.exe` y haz clic en **"Abrir archivo .sav"** para seleccionar tu
 ### 2. Configurar el overlay
 
 1. Abre `http://localhost:5051` en tu navegador
-2. Personaliza el layout, sprites, colores, fuente, etc.
+2. Personaliza el layout, sprites, colores, fuentes, sombras, etc.
 3. Haz clic en **"📋 Copiar"** para copiar la URL configurada
 
 ### 3. Añadir a OBS
 
 1. En OBS, añade una fuente → **Navegador (Browser Source)**
 2. Pega la URL copiada
-3. Tamaño recomendado: **400×100** (horizontal) o **150×400** (vertical)
+3. Tamaño recomendado: **400×100** (horizontal) o **150×400** (vertical) — sube el tamaño si usas sprites grandes o efectos
 4. Marca **"Actualizar navegador cuando la escena se active"**
 
 ## ⚙️ Opciones de configuración
@@ -77,10 +85,11 @@ Abre `pokelayout.exe` y haz clic en **"Abrir archivo .sav"** para seleccionar tu
 | **Mostrar** | Nombre, Nivel, Barra HP, Icono Shiny |
 | **Espaciado** | Distancia entre Pokémon |
 | **Tamaño sprite** | Tamaño de los sprites |
-| **Fuente** | 35+ fuentes (modernas, gaming, pixel, etc.) |
+| **Sombra / contorno (sprites)** | Sombra y outline con color, grosor (desde 0.25 px) y difuminado |
+| **Fuente** | 35+ fuentes + importar `.ttf` / `.otf` / `.woff` / `.woff2` |
 | **Tamaño texto** | Tamaño del texto |
 | **Colores** | Color de nombre, mote y nivel |
-| **Borde texto** | Contorno del texto (color y grosor) |
+| **Contorno / sombra (texto)** | Contorno y sombra del texto |
 | **Fondo** | Transparente, Oscuro o Cristal |
 
 ### Tipos de sprite
@@ -97,6 +106,8 @@ Abre `pokelayout.exe` y haz clic en **"Abrir archivo .sav"** para seleccionar tu
 | **Gen VI–IX** | ORAS, X/Y, USUM, Iconos, BDSP, Escarlata/Púrpura |
 
 Los sprites de [PokeAPI](https://github.com/PokeAPI/sprites) soportan variantes **shiny** y **female** cuando existen. Los portraits de [PMD Collab](https://pmdcollab.org/) requieren atribución (licencia CC BY-NC).
+
+> Las fuentes importadas se guardan en `custom-fonts/` junto al ejecutable y también funcionan en OBS (misma máquina con PokeLayout abierto).
 
 ## 🎮 Juegos compatibles
 
