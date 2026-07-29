@@ -150,7 +150,7 @@ El romhack [Luminescent Platinum](https://luminescent.team/) usa un formato de s
 
 Saves `.rxdata`, `.rvdata` y `.rvdata2` de juegos hechos con **Pokémon Essentials** (RPG Maker XP/VX):
 
-- Essentials v19+ (formato Hash)
+- Essentials v16+ (formato Hash)
 - Formatos antiguos (varios `Marshal.dump` concatenados)
 - Detecta equipo, mote, nivel, HP, shiny, género y forma
 
