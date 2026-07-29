@@ -503,6 +503,26 @@ public class MainForm : Form
                 return;
             }
 
+            if (path.StartsWith("/sprites/", StringComparison.OrdinalIgnoreCase) &&
+                request.HttpMethod == "GET")
+            {
+                await ServeCustomSpriteAsync(context, path["/sprites/".Length..]);
+                return;
+            }
+
+            if (path.Equals("/api/custom-sprites/packs", StringComparison.OrdinalIgnoreCase) &&
+                request.HttpMethod == "GET")
+            {
+                response.ContentType = "application/json; charset=utf-8";
+                buffer = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(ListCustomSpritePacks(), new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                }));
+                response.ContentLength64 = buffer.Length;
+                await response.OutputStream.WriteAsync(buffer);
+                return;
+            }
+
             if (path.Equals("/api/fonts", StringComparison.OrdinalIgnoreCase))
             {
                 if (request.HttpMethod == "GET")
@@ -583,6 +603,111 @@ public class MainForm : Form
         var dir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "custom-fonts");
         Directory.CreateDirectory(dir);
         return dir;
+    }
+
+    private static string GetCustomSpritesDirectory()
+    {
+        var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        var dir = Path.Combine(baseDir, "custom-sprites");
+        if (Directory.Exists(dir) && Directory.EnumerateFileSystemEntries(dir).Any())
+            return dir;
+
+        // Desarrollo: carpeta en la raíz del proyecto al ejecutar desde bin/
+        var devDir = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "custom-sprites"));
+        if (Directory.Exists(devDir))
+            return devDir;
+
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    private static readonly HashSet<string> AllowedSpriteExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".png", ".gif", ".webp"
+    };
+
+    private sealed class CustomSpritePackInfo
+    {
+        public string Id { get; set; } = "";
+        public List<string> Folders { get; set; } = new();
+        public bool HasFormsFile { get; set; }
+    }
+
+    private static List<CustomSpritePackInfo> ListCustomSpritePacks()
+    {
+        var root = GetCustomSpritesDirectory();
+        if (!Directory.Exists(root))
+            return [];
+
+        return Directory.GetDirectories(root)
+            .Select(packDir =>
+            {
+                var id = Path.GetFileName(packDir) ?? "";
+                var folders = Directory.GetDirectories(packDir)
+                    .Select(Path.GetFileName)
+                    .Where(f => !string.IsNullOrWhiteSpace(f))
+                    .Select(f => f!)
+                    .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                return new CustomSpritePackInfo
+                {
+                    Id = id,
+                    Folders = folders,
+                    HasFormsFile = File.Exists(Path.Combine(packDir, "pokemon_forms.txt"))
+                };
+            })
+            .Where(p => p.Folders.Count > 0)
+            .OrderBy(p => p.Id, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string? FindFileCaseInsensitive(string dir, string fileName)
+    {
+        fileName = Path.GetFileName(fileName);
+        var baseName = Path.GetFileNameWithoutExtension(fileName);
+        if (string.IsNullOrWhiteSpace(baseName) || !Directory.Exists(dir))
+            return null;
+
+        foreach (var file in Directory.GetFiles(dir))
+        {
+            if (!AllowedSpriteExtensions.Contains(Path.GetExtension(file))) continue;
+            if (string.Equals(Path.GetFileNameWithoutExtension(file), baseName, StringComparison.OrdinalIgnoreCase))
+                return file;
+        }
+
+        return null;
+    }
+
+    private static string? FindCustomSpritePath(string relativePath)
+    {
+        relativePath = Uri.UnescapeDataString(relativePath).Replace('\\', '/').Trim('/');
+        if (string.IsNullOrWhiteSpace(relativePath))
+            return null;
+
+        var root = Path.GetFullPath(GetCustomSpritesDirectory());
+        var segments = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length == 0)
+            return null;
+
+        string? found = null;
+
+        if (segments.Length >= 3)
+        {
+            var dir = Path.GetFullPath(Path.Combine(root, segments[0], segments[1]));
+            if (!dir.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+                return null;
+            found = FindFileCaseInsensitive(dir, segments[2]);
+        }
+        else if (segments.Length == 1)
+        {
+            found = FindFileCaseInsensitive(root, segments[0]);
+        }
+
+        if (found == null)
+            return null;
+
+        var full = Path.GetFullPath(found);
+        return full.StartsWith(root, StringComparison.OrdinalIgnoreCase) ? full : null;
     }
 
     private static readonly HashSet<string> AllowedFontExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -729,6 +854,33 @@ public class MainForm : Form
         response.ContentType = "application/json; charset=utf-8";
         response.ContentLength64 = ok.Length;
         await response.OutputStream.WriteAsync(ok);
+    }
+
+    private async Task ServeCustomSpriteAsync(HttpListenerContext context, string fileName)
+    {
+        var response = context.Response;
+        var path = FindCustomSpritePath(fileName);
+
+        if (path == null)
+        {
+            response.StatusCode = 404;
+            var err = Encoding.UTF8.GetBytes("Not Found");
+            response.ContentLength64 = err.Length;
+            await response.OutputStream.WriteAsync(err);
+            return;
+        }
+
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        response.ContentType = ext switch
+        {
+            ".gif" => "image/gif",
+            ".webp" => "image/webp",
+            _ => "image/png"
+        };
+        response.Headers.Add("Cache-Control", "public, max-age=3600");
+        var bytes = await File.ReadAllBytesAsync(path);
+        response.ContentLength64 = bytes.Length;
+        await response.OutputStream.WriteAsync(bytes);
     }
 
     private async Task ServeCustomFontAsync(HttpListenerContext context, string fileName)

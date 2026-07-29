@@ -25,6 +25,7 @@ _parse_rxdata.py
 
 # User-imported fonts (runtime)
 custom-fonts/
+custom-sprites/
 
 # PKLumiHex plugin output (regenerated from submodule on build)
 plugins/pklumihex/

@@ -7,17 +7,25 @@ const API_URL = '/api/team';
 
 let currentTeam = null;
 let customFonts = []; // { family, fileName }
+let customSpritePacks = []; // { id, folders, hasFormsFile }
 let config = {
     layout: 'horizontal',
     spriteType: 'default',
+    customSpritePack: 'geniv',
     showNickname: true,
     showLevel: true,
     showHP: false,
     showShiny: true,
+    showBadges: false,
+    badgeSize: 22,
+    badgeDimUnobtained: true,
+    nameOffsetY: 0,
+    levelPosition: 'below',
     spacing: 8,
     spriteSize: 48,
     fontFamily: 'Inter',
     fontSize: 11,
+    textUppercase: false,
     colorName: '#f8fafc',
     colorNickname: '#fbbf24',
     colorLevel: '#94a3b8',
@@ -41,6 +49,7 @@ let config = {
 };
 
 const SPRITE_BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon';
+const BADGE_BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges';
 const FALLBACK_SPRITE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png';
 
 // Tipos con soporte shiny / female / alta resolución
@@ -86,8 +95,35 @@ const SPRITE_TYPES = {
 
     // Pokémon Mystery Dungeon (SpriteCollab / PMD Collab)
     'pmd-portrait':       { source: 'pmd', emotion: 'Normal', shiny: true, female: true, highRes: false },
-    'pmd-portrait-happy': { source: 'pmd', emotion: 'Happy', shiny: true, female: true, highRes: false }
+    'pmd-portrait-happy': { source: 'pmd', emotion: 'Happy', shiny: true, female: true, highRes: false },
+
+    // Carpeta custom-sprites/<pack>/Front (PNG en hoja de sprites)
+    'custom':             { source: 'custom', ext: 'png', shiny: false, female: false, highRes: false }
 };
+
+const CUSTOM_SPRITE_PREFIX = 'custom-';
+
+function isCustomSpriteType(typeKey) {
+    return typeKey === 'custom' || (typeof typeKey === 'string' && typeKey.startsWith(CUSTOM_SPRITE_PREFIX));
+}
+
+function getCustomSpritePack(typeKey) {
+    if (typeof typeKey === 'string' && typeKey.startsWith(CUSTOM_SPRITE_PREFIX)) {
+        return typeKey.slice(CUSTOM_SPRITE_PREFIX.length);
+    }
+    return config.customSpritePack || customSpritePacks[0]?.id || 'geniv';
+}
+
+function getSpriteTypeEntry(typeKey) {
+    if (isCustomSpriteType(typeKey)) return SPRITE_TYPES.custom;
+    return SPRITE_TYPES[typeKey] || SPRITE_TYPES.default;
+}
+
+function normalizeCustomSpriteType(typeKey, pack) {
+    if (typeof typeKey === 'string' && typeKey.startsWith(CUSTOM_SPRITE_PREFIX)) return typeKey;
+    if (typeKey === 'custom' && pack) return `${CUSTOM_SPRITE_PREFIX}${pack}`;
+    return typeKey;
+}
 
 const PMD_CDN = 'https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master';
 const PMD_GRAPHQL = 'https://spriteserver.pmdcollab.org/graphql';
@@ -97,20 +133,38 @@ function isOBSMode() {
     return new URLSearchParams(window.location.search).has('obs');
 }
 
+function isBadgesOnlyMode() {
+    const view = new URLSearchParams(window.location.search).get('view');
+    return isOBSMode() && view === 'badges';
+}
+
+function shouldShowBadges() {
+    if (isBadgesOnlyMode()) return true;
+    if (isOBSMode()) return false;
+    return config.showBadges;
+}
+
+function shouldShowTeam() {
+    return !isBadgesOnlyMode();
+}
+
 function generateOBSUrl() {
     const params = new URLSearchParams();
     params.set('layout', config.layout);
-    params.set('sprite', config.spriteType);
+    params.set('sprite', normalizeCustomSpriteType(config.spriteType, config.customSpritePack));
     params.set('spacing', config.spacing);
     params.set('size', config.spriteSize);
     params.set('font', config.fontFamily);
     params.set('fontsize', config.fontSize);
+    params.set('uppercase', config.textUppercase ? '1' : '0');
     params.set('bg', config.background);
     params.set('cname', config.colorName.replace('#', ''));
     params.set('cnick', config.colorNickname.replace('#', ''));
     params.set('clevel', config.colorLevel.replace('#', ''));
     params.set('nickname', config.showNickname ? '1' : '0');
     params.set('level', config.showLevel ? '1' : '0');
+    params.set('namey', config.nameOffsetY);
+    params.set('levelpos', config.levelPosition);
     params.set('hp', config.showHP ? '1' : '0');
     params.set('shiny', config.showShiny ? '1' : '0');
     params.set('stroke', config.textStroke ? '1' : '0');
@@ -132,27 +186,57 @@ function generateOBSUrl() {
     return window.location.origin + '/?obs&' + params.toString();
 }
 
+function generateBadgesOBSUrl() {
+    const params = new URLSearchParams();
+    params.set('view', 'badges');
+    params.set('bg', config.background);
+    params.set('font', config.fontFamily);
+    params.set('fontsize', config.fontSize);
+    params.set('uppercase', config.textUppercase ? '1' : '0');
+    params.set('badgesize', config.badgeSize);
+    params.set('badgedim', config.badgeDimUnobtained ? '1' : '0');
+    params.set('clevel', config.colorLevel.replace('#', ''));
+    return window.location.origin + '/?obs&' + params.toString();
+}
+
 function updateOBSUrlField() {
-    const el = document.getElementById('obsUrl');
-    if (el) el.value = generateOBSUrl();
+    const teamUrl = document.getElementById('obsUrl');
+    const badgesUrl = document.getElementById('obsBadgesUrl');
+    if (teamUrl) teamUrl.value = generateOBSUrl();
+    if (badgesUrl) badgesUrl.value = generateBadgesOBSUrl();
 }
 
 function loadConfigFromURL() {
     const p = new URLSearchParams(window.location.search);
+    if (p.get('view') === 'badges') config.showBadges = true;
     if (p.has('layout')) config.layout = p.get('layout');
     if (p.has('sprite')) config.spriteType = p.get('sprite');
+    if (p.has('cspritepack')) config.customSpritePack = p.get('cspritepack');
+    if (isCustomSpriteType(config.spriteType)) {
+        config.spriteType = normalizeCustomSpriteType(config.spriteType, config.customSpritePack);
+        config.customSpritePack = getCustomSpritePack(config.spriteType);
+    }
     if (p.has('spacing')) config.spacing = parseInt(p.get('spacing')) || 8;
     if (p.has('size')) config.spriteSize = parseInt(p.get('size')) || 48;
     if (p.has('font')) config.fontFamily = p.get('font');
     if (p.has('fontsize')) config.fontSize = parseInt(p.get('fontsize')) || 11;
+    if (p.has('uppercase')) config.textUppercase = p.get('uppercase') === '1';
     if (p.has('bg')) config.background = p.get('bg');
     if (p.has('cname')) config.colorName = '#' + p.get('cname');
     if (p.has('cnick')) config.colorNickname = '#' + p.get('cnick');
     if (p.has('clevel')) config.colorLevel = '#' + p.get('clevel');
     if (p.has('nickname')) config.showNickname = p.get('nickname') === '1';
     if (p.has('level')) config.showLevel = p.get('level') === '1';
+    if (p.has('namey')) config.nameOffsetY = parseInt(p.get('namey'), 10) || 0;
+    if (p.has('levelpos')) {
+        const pos = p.get('levelpos');
+        const allowed = ['below', 'top-left', 'top-right', 'bottom-left', 'bottom-right'];
+        if (allowed.includes(pos)) config.levelPosition = pos;
+    }
     if (p.has('hp')) config.showHP = p.get('hp') === '1';
     if (p.has('shiny')) config.showShiny = p.get('shiny') === '1';
+    if (p.has('badgesize')) config.badgeSize = parseInt(p.get('badgesize')) || 22;
+    if (p.has('badgedim')) config.badgeDimUnobtained = p.get('badgedim') === '1';
     if (p.has('stroke')) config.textStroke = p.get('stroke') === '1';
     if (p.has('strokec')) config.strokeColor = '#' + p.get('strokec');
     if (p.has('strokew')) config.strokeWidth = parseFloat(p.get('strokew')) || 2;
@@ -178,7 +262,13 @@ function loadConfig() {
     }
     const saved = localStorage.getItem('pokelayout-config');
     if (saved) {
-        try { config = { ...config, ...JSON.parse(saved) }; } catch (e) {}
+        try {
+            config = { ...config, ...JSON.parse(saved) };
+            if (isCustomSpriteType(config.spriteType)) {
+                config.spriteType = normalizeCustomSpriteType(config.spriteType, config.customSpritePack);
+                config.customSpritePack = getCustomSpritePack(config.spriteType);
+            }
+        } catch (e) {}
     }
 }
 
@@ -291,6 +381,105 @@ function buildImgErrorHandler(fallbackUrl, fallback2) {
     return `if(this.dataset.fb!=='1'){this.dataset.fb='1';this.src='${fallbackUrl}';}else if(this.dataset.fb!=='2'){this.dataset.fb='2';this.src='${fallback2}';}else{this.onerror=null;this.src='${FALLBACK_SPRITE}';}`;
 }
 
+function buildChainedImgErrorHandler(urls) {
+    const safe = (urls || []).filter(Boolean).map(u => u.replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+    if (!safe.length) return `this.onerror=null;this.src='${FALLBACK_SPRITE}';`;
+    const json = JSON.stringify(safe);
+    return `var u=${json};var i=+(this.dataset.ci||0);if(i<u.length){this.dataset.ci=i+1;this.src=u[i];}else{this.onerror=null;}`;
+}
+
+function setupSpriteSheet(img) {
+    const wrap = img.closest('.sprite-sheet-wrap');
+    if (!wrap || wrap.dataset.sheetReady) return;
+
+    const apply = () => {
+        if (wrap.dataset.sheetReady) return;
+        const nw = img.naturalWidth;
+        const nh = img.naturalHeight;
+        if (!nw || !nh) return;
+
+        const size = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sprite-size'), 10) || 48;
+        const frames = Math.max(1, Math.floor(nw / nh));
+
+        stopSpriteSheetAnim(wrap);
+        wrap.querySelector('.sprite-sheet-canvas')?.remove();
+
+        const canvas = document.createElement('canvas');
+        canvas.className = 'sprite-sheet-canvas';
+        canvas.width = size;
+        canvas.height = size;
+        wrap.appendChild(canvas);
+        img.style.display = 'none';
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.imageSmoothingEnabled = false;
+
+        const drawFrame = (index) => {
+            ctx.clearRect(0, 0, size, size);
+            ctx.drawImage(img, index * nh, 0, nh, nh, 0, 0, size, size);
+        };
+
+        drawFrame(0);
+
+        if (frames > 1) {
+            let frame = 0;
+            let lastTime = 0;
+            const msPerFrame = 70;
+            const tick = (time) => {
+                if (!wrap.isConnected) return;
+                if (time - lastTime >= msPerFrame) {
+                    lastTime = time;
+                    frame = (frame + 1) % frames;
+                    drawFrame(frame);
+                }
+                wrap._spriteAnimId = requestAnimationFrame(tick);
+            };
+            wrap._spriteAnimId = requestAnimationFrame(tick);
+        }
+
+        wrap.dataset.sheetReady = '1';
+    };
+
+    if (img.complete && img.naturalWidth) apply();
+    else img.addEventListener('load', apply, { once: true });
+}
+
+function stopSpriteSheetAnim(wrap) {
+    if (wrap._spriteAnimId) {
+        cancelAnimationFrame(wrap._spriteAnimId);
+        wrap._spriteAnimId = null;
+    }
+}
+
+function resetSpriteSheets() {
+    document.querySelectorAll('.sprite-sheet-wrap').forEach(wrap => {
+        stopSpriteSheetAnim(wrap);
+        delete wrap.dataset.sheetReady;
+        wrap.querySelector('.sprite-sheet-canvas')?.remove();
+        const img = wrap.querySelector('.sprite-sheet-frame');
+        if (img) {
+            img.style.display = '';
+            img.style.animation = 'none';
+            img.style.transform = '';
+            img.style.width = '';
+            img.style.height = '';
+        }
+    });
+}
+
+function setupAllSpriteSheets() {
+    document.querySelectorAll('.sprite-sheet-frame').forEach(setupSpriteSheet);
+}
+
+function buildCustomSpriteImgHtml(url, className, filterStyle, onErr, alt = '') {
+    const altAttr = alt ? ` alt="${escapeHtml(alt)}"` : ' alt="" aria-hidden="true"';
+    const draggable = alt ? '' : ' draggable="false"';
+    return `<div class="sprite-sheet-wrap ${className}" style="filter:${filterStyle}">`
+        + `<img src="${url}" class="sprite-sheet-frame"${altAttr}${draggable} onload="setupSpriteSheet(this)" onerror="${onErr}">`
+        + `</div>`;
+}
+
 function getSpriteFxPadding() {
     let pad = 4; // margen mínimo para que el sprite no toque el borde del box
     if (config.spriteStroke) {
@@ -308,32 +497,51 @@ function getSpriteFxPadding() {
 function applyConfig() {
     const root = document.documentElement;
     const container = document.getElementById('team');
-    const wrapper = document.getElementById('teamWrapper');
+    const teamWrapper = document.getElementById('teamWrapper');
+    const badgesWrapper = document.getElementById('badgesWrapper');
     const fxPad = getSpriteFxPadding();
     
     root.style.setProperty('--spacing', config.spacing + 'px');
     root.style.setProperty('--sprite-size', config.spriteSize + 'px');
+    root.style.setProperty('--badge-size', config.badgeSize + 'px');
     root.style.setProperty('--sprite-fx-pad', fxPad + 'px');
     root.style.setProperty('--font-family', `'${config.fontFamily}', sans-serif`);
     root.style.setProperty('--font-size', config.fontSize + 'px');
+    root.style.setProperty('--text-transform', config.textUppercase ? 'uppercase' : 'none');
     root.style.setProperty('--color-name', config.colorName);
     root.style.setProperty('--color-nickname', config.colorNickname);
     root.style.setProperty('--color-level', config.colorLevel);
+    root.style.setProperty('--name-offset-y', (config.nameOffsetY || 0) + 'px');
     root.style.setProperty('--stroke-color', config.strokeColor);
     root.style.setProperty('--stroke-width', config.strokeWidth + 'px');
     root.style.setProperty('--text-fx-shadow', buildTextFxShadow());
     updateSpriteSvgFilter();
     
-    container.className = 'team-container ' + config.layout;
-    
-    wrapper.className = 'team-wrapper';
-    if (config.background !== 'transparent') {
-        wrapper.classList.add('bg-' + config.background);
+    if (isCustomSpriteType(config.spriteType) && currentTeam?.team?.length) {
+        resetSpriteSheets();
+        setupAllSpriteSheets();
     }
+    
+    if (container) container.className = 'team-container ' + config.layout;
+    
+    if (teamWrapper) {
+        teamWrapper.className = 'team-wrapper';
+        if (config.background !== 'transparent') teamWrapper.classList.add('bg-' + config.background);
+    }
+    if (badgesWrapper) {
+        badgesWrapper.className = 'badges-wrapper';
+        if (config.background !== 'transparent') badgesWrapper.classList.add('bg-' + config.background);
+        if (isBadgesOnlyMode()) badgesWrapper.hidden = false;
+    }
+    
+    document.body.classList.toggle('obs-badges-only', isBadgesOnlyMode());
     
     if (!isOBSMode()) {
         document.querySelectorAll('[data-layout]').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.layout === config.layout);
+        });
+        document.querySelectorAll('[data-level-pos]').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.levelPos === config.levelPosition);
         });
         document.querySelectorAll('.bg-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.bg === config.background);
@@ -345,6 +553,13 @@ function applyConfig() {
         if (el('showLevel')) el('showLevel').checked = config.showLevel;
         if (el('showHP')) el('showHP').checked = config.showHP;
         if (el('showShiny')) el('showShiny').checked = config.showShiny;
+        if (el('showBadgesPreview')) el('showBadgesPreview').checked = config.showBadges;
+        if (el('badgeSize')) el('badgeSize').value = config.badgeSize;
+        if (el('badgeSizeInput')) el('badgeSizeInput').value = config.badgeSize;
+        if (el('badgeDimUnobtained')) el('badgeDimUnobtained').checked = config.badgeDimUnobtained;
+        toggleOptions('badgeOptions', true);
+        if (el('nameOffsetY')) el('nameOffsetY').value = config.nameOffsetY;
+        if (el('nameOffsetYInput')) el('nameOffsetYInput').value = config.nameOffsetY;
         if (el('spacing')) el('spacing').value = config.spacing;
         if (el('spacingInput')) el('spacingInput').value = config.spacing;
         if (el('spriteSize')) el('spriteSize').value = config.spriteSize;
@@ -353,6 +568,7 @@ function applyConfig() {
         if (el('fontFamily')) el('fontFamily').value = config.fontFamily;
         if (el('fontSize')) el('fontSize').value = config.fontSize;
         if (el('fontSizeInput')) el('fontSizeInput').value = config.fontSize;
+        if (el('textUppercase')) el('textUppercase').checked = config.textUppercase;
         if (el('colorName')) el('colorName').value = config.colorName;
         if (el('colorNickname')) el('colorNickname').value = config.colorNickname;
         if (el('colorLevel')) el('colorLevel').value = config.colorLevel;
@@ -389,7 +605,10 @@ function applyConfig() {
         updateOBSUrlField();
     }
     
-    if (currentTeam) renderTeam(currentTeam);
+    if (currentTeam) {
+        if (shouldShowTeam()) renderTeam(currentTeam);
+        renderBadges(currentTeam);
+    }
 }
 
 function toggleOptions(id, visible) {
@@ -405,6 +624,14 @@ function setupConfigListeners() {
             applyConfig();
         });
     });
+
+    document.querySelectorAll('[data-level-pos]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            config.levelPosition = btn.dataset.levelPos;
+            saveConfig();
+            applyConfig();
+        });
+    });
     
     document.querySelectorAll('.bg-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -416,8 +643,26 @@ function setupConfigListeners() {
     
     ['showNickname', 'showLevel', 'showHP', 'showShiny'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.addEventListener('change', e => { config[id] = e.target.checked; saveConfig(); applyConfig(); });
+        if (el) el.addEventListener('change', e => {
+            config[id] = e.target.checked;
+            saveConfig();
+            applyConfig();
+        });
     });
+
+    const showBadgesPreview = document.getElementById('showBadgesPreview');
+    if (showBadgesPreview) {
+        showBadgesPreview.addEventListener('change', e => {
+            config.showBadges = e.target.checked;
+            saveConfig();
+            applyConfig();
+        });
+    }
+
+    bindCheckbox('badgeDimUnobtained', 'badgeDimUnobtained');
+    setupRangeInput('badgeSize', 'badgeSizeInput', 'badgeSize');
+
+    setupRangeInput('nameOffsetY', 'nameOffsetYInput', 'nameOffsetY');
     
     // Text stroke checkbox
     const textStroke = document.getElementById('textStroke');
@@ -461,10 +706,15 @@ function setupConfigListeners() {
     const spriteType = document.getElementById('spriteType');
     if (spriteType) spriteType.addEventListener('change', async e => {
         config.spriteType = e.target.value;
+        if (isCustomSpriteType(config.spriteType)) {
+            config.customSpritePack = getCustomSpritePack(config.spriteType);
+        }
         saveConfig();
         applyConfig();
-        if (SPRITE_TYPES[config.spriteType]?.source === 'pmd' && currentTeam?.team?.length) {
+        if (getSpriteTypeEntry(config.spriteType).source === 'pmd' && currentTeam?.team?.length) {
             await resolvePmdPortraits(currentTeam.team);
+            renderTeam(currentTeam);
+        } else if (isCustomSpriteType(config.spriteType) && currentTeam?.team?.length) {
             renderTeam(currentTeam);
         }
     });
@@ -496,6 +746,8 @@ function setupConfigListeners() {
     setupRangeInput('spacing', 'spacingInput', 'spacing');
     setupRangeInput('spriteSize', 'spriteSizeInput', 'spriteSize');
     setupRangeInput('fontSize', 'fontSizeInput', 'fontSize');
+
+    bindCheckbox('textUppercase', 'textUppercase');
     
     ['colorName', 'colorNickname', 'colorLevel'].forEach(id => {
         const el = document.getElementById(id);
@@ -507,7 +759,10 @@ function setupConfigListeners() {
         toggleConfig.addEventListener('click', () => {
             const body = document.getElementById('configBody');
             body.classList.toggle('collapsed');
-            toggleConfig.textContent = body.classList.contains('collapsed') ? '+' : '−';
+            const collapsed = body.classList.contains('collapsed');
+            toggleConfig.textContent = collapsed ? '+' : '−';
+            toggleConfig.title = collapsed ? 'Expandir panel' : 'Contraer panel';
+            toggleConfig.setAttribute('aria-label', toggleConfig.title);
         });
     }
     
@@ -518,6 +773,17 @@ function setupConfigListeners() {
                 copyUrlBtn.textContent = '✓ Copiado';
                 copyUrlBtn.classList.add('copied');
                 setTimeout(() => { copyUrlBtn.textContent = '📋 Copiar'; copyUrlBtn.classList.remove('copied'); }, 2000);
+            });
+        });
+    }
+
+    const copyBadgesUrlBtn = document.getElementById('copyBadgesUrlBtn');
+    if (copyBadgesUrlBtn) {
+        copyBadgesUrlBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(document.getElementById('obsBadgesUrl').value).then(() => {
+                copyBadgesUrlBtn.textContent = '✓ Copiado';
+                copyBadgesUrlBtn.classList.add('copied');
+                setTimeout(() => { copyBadgesUrlBtn.textContent = '📋 Copiar'; copyBadgesUrlBtn.classList.remove('copied'); }, 2000);
             });
         });
     }
@@ -585,6 +851,53 @@ async function loadCustomFonts() {
         }
     } catch (e) {
         console.warn('[Fonts] No se pudieron cargar fuentes custom', e);
+    }
+}
+
+async function loadCustomSpritePacks() {
+    try {
+        const res = await fetch('/api/custom-sprites/packs');
+        if (!res.ok) return;
+        customSpritePacks = await res.json() || [];
+        refreshCustomSpriteOptions();
+    } catch (e) {
+        console.warn('[Sprites] No se pudieron cargar packs custom', e);
+    }
+}
+
+function refreshCustomSpriteOptions() {
+    const group = document.getElementById('customSpritesGroup');
+    const select = document.getElementById('spriteType');
+    if (!group) return;
+
+    group.innerHTML = '';
+
+    const packs = customSpritePacks.length
+        ? customSpritePacks
+        : [{ id: config.customSpritePack || 'geniv' }];
+
+    for (const pack of packs) {
+        const opt = document.createElement('option');
+        opt.value = `${CUSTOM_SPRITE_PREFIX}${pack.id}`;
+        opt.textContent = pack.id;
+        group.appendChild(opt);
+    }
+
+    if (config.spriteType === 'custom') {
+        config.spriteType = `${CUSTOM_SPRITE_PREFIX}${getCustomSpritePack('custom')}`;
+        config.customSpritePack = getCustomSpritePack(config.spriteType);
+        saveConfig();
+    }
+
+    const values = packs.map(p => `${CUSTOM_SPRITE_PREFIX}${p.id}`);
+    if (isCustomSpriteType(config.spriteType) && !values.includes(config.spriteType)) {
+        config.spriteType = values[0] || 'default';
+        config.customSpritePack = getCustomSpritePack(config.spriteType);
+        saveConfig();
+    }
+
+    if (select && [...select.options].some(o => o.value === config.spriteType)) {
+        select.value = config.spriteType;
     }
 }
 
@@ -737,6 +1050,64 @@ function buildPmdPortraitUrl(id, form = 0, shiny = false, female = false, emotio
     return `${PMD_CDN}/portrait/${path}/${emotion}.png`;
 }
 
+/** Nombre de archivo: ABOMASNOW, ABOMASNOW_1 (forma/mega), etc. */
+function normalizeSpeciesFileName(speciesName) {
+    return (speciesName || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9]/g, '')
+        .toUpperCase();
+}
+
+/** Clave Essentials / nombre de archivo: ZORUA, ABOMASNOW, etc. */
+function getCustomSpeciesKey(pokemon) {
+    if (pokemon.speciesKey) {
+        return pokemon.speciesKey.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    }
+    return normalizeSpeciesFileName(pokemon.speciesName);
+}
+
+/** Variantes de nombre: ZORUA, ZORUA_1 (forma del save) */
+function buildCustomSpriteVariants(pokemon) {
+    const base = getCustomSpeciesKey(pokemon);
+    const form = pokemon.form || 0;
+    if (form > 0) return [`${base}_${form}`, base];
+    return [base];
+}
+
+function buildCustomSpritePath(variantName, folder) {
+    const pack = getCustomSpritePack(config.spriteType);
+    return '/sprites/' + [pack, folder, `${variantName}.png`].map(encodeURIComponent).join('/');
+}
+
+/** Prioridad: shiny → normal; forma+fembra → forma → hembra → base */
+function buildCustomSpriteUrls(pokemon) {
+    const shiny = !!pokemon.isShiny;
+    const variants = buildCustomSpriteVariants(pokemon);
+    const folders = shiny ? ['Front shiny', 'Front'] : ['Front'];
+    const urls = [];
+    for (const folder of folders) {
+        for (const variant of variants) {
+            urls.push(buildCustomSpritePath(variant, folder));
+        }
+    }
+    return [...new Set(urls)];
+}
+
+function buildCustomSpriteFileName(pokemon) {
+    return buildCustomSpriteVariants(pokemon)[0];
+}
+
+function buildCustomSpriteUrl(pokemon) {
+    const urls = buildCustomSpriteUrls(pokemon);
+    return urls[0] || FALLBACK_SPRITE;
+}
+
+function buildCustomSpriteFallbackUrl(pokemon) {
+    const urls = buildCustomSpriteUrls(pokemon);
+    return urls[1] || null;
+}
+
 function getSpriteUrl(pokemon) {
     const id = pokemon.species;
     if (!id) return FALLBACK_SPRITE;
@@ -744,8 +1115,11 @@ function getSpriteUrl(pokemon) {
     const shiny = !!pokemon.isShiny;
     const female = pokemon.gender === 1;
     const form = pokemon.form || 0;
-    const typeKey = SPRITE_TYPES[config.spriteType] ? config.spriteType : 'default';
-    const type = SPRITE_TYPES[typeKey];
+    const type = getSpriteTypeEntry(config.spriteType);
+
+    if (type.source === 'custom') {
+        return buildCustomSpriteUrl(pokemon);
+    }
 
     if (type.source === 'pmd') {
         const cacheKey = `${id}-${form}-${shiny}-${female}-${type.emotion}`;
@@ -753,12 +1127,12 @@ function getSpriteUrl(pokemon) {
         return buildPmdPortraitUrl(id, form, shiny, female, type.emotion || 'Normal');
     }
 
-    return buildSpriteUrl(typeKey, id, shiny, female);
+    return buildSpriteUrl(config.spriteType, id, shiny, female);
 }
 
 /** Resuelve portraits vía GraphQL (más fiable con formas) y rellena caché. */
 async function resolvePmdPortraits(team) {
-    const type = SPRITE_TYPES[config.spriteType];
+    const type = getSpriteTypeEntry(config.spriteType);
     if (!type || type.source !== 'pmd' || !team?.length) return;
 
     const emotion = type.emotion || 'Normal';
@@ -824,23 +1198,30 @@ function createPokemonCard(pokemon) {
     const isFainted = pokemon.currentHP === 0;
     const displayName = (config.showNickname && pokemon.hasNickname && pokemon.nickname) ? pokemon.nickname : pokemon.speciesName;
     const hasNickname = pokemon.hasNickname && pokemon.nickname;
-    const spriteType = SPRITE_TYPES[config.spriteType] || SPRITE_TYPES.default;
+    const spriteType = getSpriteTypeEntry(config.spriteType);
     const isHighRes = !!spriteType.highRes;
     let spriteClass = 'pokemon-sprite' + (isHighRes ? ' high-res' : '') + (isShiny && config.showShiny ? ' shiny' : '') + (isFainted ? ' fainted' : '');
     const spriteFilter = buildSpriteFilter(isShiny, isFainted);
     
     let nameClass = 'pokemon-name' + (hasNickname ? ' nickname' : '') + (config.textStroke ? ' has-stroke' : '');
-    let levelClass = 'pokemon-level' + (config.textStroke ? ' has-stroke' : '');
+    const levelPos = config.levelPosition || 'below';
+    const levelInCorner = config.showLevel && levelPos !== 'below';
+    let levelClass = 'pokemon-level' + (config.textStroke ? ' has-stroke' : '')
+        + (levelInCorner ? ` corner corner-${levelPos}` : '');
 
     const primaryUrl = getSpriteUrl(pokemon);
-    const typeKey = config.spriteType;
-    const type = SPRITE_TYPES[typeKey] || SPRITE_TYPES.default;
+    const typeKey = isCustomSpriteType(config.spriteType) ? 'default' : config.spriteType;
+    const type = spriteType;
     const shiny = !!pokemon.isShiny;
     const form = pokemon.form || 0;
+    const isCustom = type.source === 'custom';
 
     // Cadena de fallbacks: female → no-female → no-shiny → pokéball
     let fallbackUrl = FALLBACK_SPRITE;
-    if (type.source === 'pmd') {
+    if (isCustom) {
+        const customUrls = buildCustomSpriteUrls(pokemon);
+        fallbackUrl = customUrls[1] || buildSpriteUrl('default', pokemon.species, shiny, false);
+    } else if (type.source === 'pmd') {
         if (pokemon.gender === 1) {
             fallbackUrl = buildPmdPortraitUrl(pokemon.species, form, shiny, false, type.emotion || 'Normal');
         } else if (shiny) {
@@ -850,24 +1231,47 @@ function createPokemonCard(pokemon) {
         fallbackUrl = buildSpriteUrl(typeKey, pokemon.species, shiny, false);
     }
 
-    const fallback2 = (type.source === 'pmd' && shiny)
-        ? buildPmdPortraitUrl(pokemon.species, form, false, false, type.emotion || 'Normal')
-        : FALLBACK_SPRITE;
+    const fallback2 = isCustom
+        ? buildSpriteUrl('default', pokemon.species, shiny, false)
+        : ((type.source === 'pmd' && shiny)
+            ? buildPmdPortraitUrl(pokemon.species, form, false, false, type.emotion || 'Normal')
+            : FALLBACK_SPRITE);
     
     let html = `<div class="pokemon-card">`;
     if (config.showShiny && isShiny) html += `<span class="shiny-icon">✨</span>`;
 
-    const onErr = buildImgErrorHandler(fallbackUrl, fallback2);
+    const onErr = isCustom
+        ? buildChainedImgErrorHandler([...buildCustomSpriteUrls(pokemon).slice(1), fallback2, FALLBACK_SPRITE])
+        : buildImgErrorHandler(fallbackUrl, fallback2);
     html += `<div class="pokemon-sprite-stack">`;
-    // Capa de sombra: mismo GIF/PNG duplicado → la sombra sigue la silueta (no el rectángulo del <img>)
-    if (config.spriteShadow) {
-        html += `<img src="${primaryUrl}" alt="" class="pokemon-sprite sprite-shadow-layer${isHighRes ? ' high-res' : ''}${isFainted ? ' fainted' : ''}" style="filter:url(#spriteShadowFilter)" aria-hidden="true" draggable="false" onerror="${onErr}">`;
+    if (isCustom) {
+        if (config.spriteShadow) {
+            html += buildCustomSpriteImgHtml(
+                primaryUrl,
+                `pokemon-sprite sprite-shadow-layer${isFainted ? ' fainted' : ''}`,
+                'url(#spriteShadowFilter)',
+                onErr
+            );
+        }
+        html += buildCustomSpriteImgHtml(
+            primaryUrl,
+            spriteClass,
+            spriteFilter,
+            onErr,
+            pokemon.speciesName
+        );
+    } else {
+        // Capa de sombra: mismo GIF/PNG duplicado → la sombra sigue la silueta (no el rectángulo del <img>)
+        if (config.spriteShadow) {
+            html += `<img src="${primaryUrl}" alt="" class="pokemon-sprite sprite-shadow-layer${isHighRes ? ' high-res' : ''}${isFainted ? ' fainted' : ''}" style="filter:url(#spriteShadowFilter)" aria-hidden="true" draggable="false" onerror="${onErr}">`;
+        }
+        html += `<img src="${primaryUrl}" alt="${escapeHtml(pokemon.speciesName)}" class="${spriteClass}" style="filter:${spriteFilter}" data-fb2="${fallback2}" onerror="${onErr}">`;
     }
-    html += `<img src="${primaryUrl}" alt="${escapeHtml(pokemon.speciesName)}" class="${spriteClass}" style="filter:${spriteFilter}" data-fb2="${fallback2}" onerror="${onErr}">`;
+    if (levelInCorner) html += `<span class="${levelClass}">Nv.${pokemon.level}</span>`;
     html += `</div>`;
 
     if (config.showNickname) html += `<span class="${nameClass}">${escapeHtml(displayName)}</span>`;
-    if (config.showLevel) html += `<span class="${levelClass}">Nv.${pokemon.level}</span>`;
+    if (config.showLevel && !levelInCorner) html += `<span class="${levelClass}">Nv.${pokemon.level}</span>`;
     if (config.showHP) html += `<div class="hp-bar-container"><div class="hp-bar ${hp.cls}" style="width:${hp.pct}%"></div></div>`;
     html += `</div>`;
     return html;
@@ -879,6 +1283,57 @@ function renderTeam(data) {
     const c = document.getElementById('team');
     if (!data?.team?.length) { c.innerHTML = `<div class="empty-state">Sin Pokémon</div>`; return; }
     c.innerHTML = data.team.map(p => createPokemonCard(p)).join('');
+    setupAllSpriteSheets();
+}
+
+function buildBadgeUrl(spriteId) {
+    return `${BADGE_BASE}/${spriteId}.png`;
+}
+
+function renderBadges(data) {
+    const panel = document.getElementById('badgesPanel');
+    if (!panel) return;
+
+    if (!shouldShowBadges() || !data?.badgeSets?.length) {
+        panel.hidden = true;
+        panel.innerHTML = '';
+        const wrapper = document.getElementById('badgesWrapper');
+        if (wrapper && !isOBSMode()) wrapper.hidden = true;
+        return;
+    }
+
+    const sets = data.badgeSets
+        .map(set => {
+            const badges = (set.badges || []).filter(b => {
+                if (b.obtained) return true;
+                return config.badgeDimUnobtained;
+            });
+            if (!badges.length) return '';
+            const label = set.region ? `<span class="badge-set-label">${escapeHtml(set.region)}</span>` : '';
+            const items = badges.map(b => {
+                const cls = b.obtained ? 'badge-item' : 'badge-item unobtained';
+                const url = buildBadgeUrl(b.spriteId);
+                const title = escapeHtml(b.name || '');
+                return `<span class="${cls}" title="${title}"><img src="${url}" alt="${title}" loading="lazy" onerror="this.style.opacity='0.15'"></span>`;
+            }).join('');
+            return `<div class="badge-set">${label}<div class="badge-row">${items}</div></div>`;
+        })
+        .filter(Boolean)
+        .join('');
+
+    if (!sets) {
+        panel.hidden = true;
+        panel.innerHTML = '';
+        const wrapper = document.getElementById('badgesWrapper');
+        if (wrapper && !isOBSMode()) wrapper.hidden = true;
+        return;
+    }
+
+    panel.hidden = false;
+    panel.innerHTML = sets;
+
+    const wrapper = document.getElementById('badgesWrapper');
+    if (wrapper && !isOBSMode()) wrapper.hidden = false;
 }
 
 function teamsEqual(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
@@ -888,17 +1343,21 @@ async function updateOverlay() {
     if (teamsEqual(currentTeam, t)) return;
 
     currentTeam = t;
-    const type = SPRITE_TYPES[config.spriteType];
-    if (type?.source === 'pmd' && t?.team?.length) {
-        await resolvePmdPortraits(t.team);
+    if (shouldShowTeam()) {
+        const type = getSpriteTypeEntry(config.spriteType);
+        if (type.source === 'pmd' && t?.team?.length) {
+            await resolvePmdPortraits(t.team);
+        }
+        renderTeam(t);
     }
-    renderTeam(t);
+    renderBadges(t);
 }
 
 async function init() {
     if (isOBSMode()) document.body.classList.add('obs-mode');
     loadConfig();
     await loadCustomFonts();
+    await loadCustomSpritePacks();
     if (!isOBSMode()) setupConfigListeners();
     applyConfig();
     await updateOverlay();
@@ -906,3 +1365,4 @@ async function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+window.setupSpriteSheet = setupSpriteSheet;

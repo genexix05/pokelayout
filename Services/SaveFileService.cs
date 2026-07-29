@@ -7,6 +7,7 @@ public class PokemonData
     public int Slot { get; set; }
     public int Species { get; set; }
     public string SpeciesName { get; set; } = "";
+    public string SpeciesKey { get; set; } = "";
     public string Nickname { get; set; } = "";
     public bool HasNickname { get; set; }
     public int Level { get; set; }
@@ -25,6 +26,7 @@ public class TeamData
     public string GameVersion { get; set; } = "";
     public string TrainerName { get; set; } = "";
     public List<PokemonData> Team { get; set; } = new();
+    public List<BadgeSetData> BadgeSets { get; set; } = new();
     public DateTime LastUpdated { get; set; }
 }
 
@@ -111,7 +113,11 @@ public class SaveFileService
             sav = TryLoadSwitchSizedSave(data, filePath);
 
         if (sav != null)
-            return BuildTeamFromSave(sav);
+        {
+            var team = BuildTeamFromSave(sav);
+            team.BadgeSets = BadgeReader.Extract(sav);
+            return team;
+        }
 
         // Luminescent Platinum / forks: PKHeX oficial no los reconoce
         if (LumiSaveBridge.IsLumiCandidate(data, filePath))
@@ -144,6 +150,7 @@ public class SaveFileService
                 Slot = i + 1,
                 Species = pk.Species,
                 SpeciesName = GetSpeciesName(pk.Species),
+                SpeciesKey = NormalizeSpeciesKey(GetSpeciesName(pk.Species)),
                 Nickname = pk.Nickname,
                 HasNickname = pk.IsNicknamed,
                 Level = pk.CurrentLevel,
@@ -242,6 +249,7 @@ public class SaveFileService
         {
             GameVersion = gameVersion,
             TrainerName = GetString(player, "name") ?? Path.GetFileNameWithoutExtension(filePath),
+            BadgeSets = BadgeReader.ExtractEssentials(player),
             LastUpdated = DateTime.Now
         };
 
@@ -288,6 +296,7 @@ public class SaveFileService
                     Slot = i + 1,
                     Species = speciesId,
                     SpeciesName = speciesName,
+                    SpeciesKey = NormalizeSpeciesKey(speciesKey),
                     Nickname = hasNickname ? nickname! : speciesName,
                     HasNickname = hasNickname,
                     Level = level,
@@ -355,6 +364,12 @@ public class SaveFileService
         if (string.IsNullOrWhiteSpace(s) || s is "0" or "null")
             return "";
         return s.Replace('_', ' ');
+    }
+
+    private static string NormalizeSpeciesKey(string? key)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return "";
+        return key.Trim().TrimStart(':').ToUpperInvariant().Replace(" ", "");
     }
 
     private static string GetSpeciesName(ushort species)

@@ -230,6 +230,7 @@ internal static class LumiSaveBridge
                 Slot = slot,
                 Species = species,
                 SpeciesName = speciesName,
+                SpeciesKey = NormalizeSpeciesKey(speciesName),
                 Nickname = nickname,
                 HasNickname = isNicknamed,
                 Level = level,
@@ -244,7 +245,40 @@ internal static class LumiSaveBridge
             });
         }
 
+        team.BadgeSets = TryReadBdspBadges(sav);
         return team;
+    }
+
+    private static List<BadgeSetData> TryReadBdspBadges(object sav)
+    {
+        try
+        {
+            var flagWork = sav.GetType().GetProperty("FlagWork")?.GetValue(sav);
+            if (flagWork == null)
+                return [];
+
+            var getSystemFlag = flagWork.GetType().GetMethod("GetSystemFlag");
+            if (getSystemFlag == null)
+                return [];
+
+            var names = new[] { "Carbón", "Bosque", "Cobre", "Relicario", "Icónica", "Glaciar", "Guadaña", "Isla" };
+            var set = new BadgeSetData { Region = "Sinnoh" };
+            for (int i = 0; i < 8; i++)
+            {
+                var obtained = Convert.ToBoolean(getSystemFlag.Invoke(flagWork, [124 + i]) ?? false);
+                set.Badges.Add(new BadgeEntry
+                {
+                    SpriteId = 25 + i,
+                    Name = names[i],
+                    Obtained = obtained
+                });
+            }
+            return [set];
+        }
+        catch
+        {
+            return [];
+        }
     }
 
     private static string? GetSpeciesNameFromLumi(int species)
@@ -294,5 +328,11 @@ internal static class LumiSaveBridge
             return "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png";
         var shinyPath = shiny ? "shiny/" : "";
         return $"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{shinyPath}{species}.png";
+    }
+
+    private static string NormalizeSpeciesKey(string? key)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return "";
+        return key.Trim().TrimStart(':').ToUpperInvariant().Replace(" ", "");
     }
 }

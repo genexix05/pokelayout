@@ -9,7 +9,7 @@
     <RootNamespace>PokeLayout</RootNamespace>
     <ApplicationIcon>icon.ico</ApplicationIcon>
     <!-- No compilar el submodule de PKLumiHex dentro de este proyecto -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);deps\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);deps\**;tools\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
@@ -25,6 +25,10 @@
     </Content>
     <Content Include="icon.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="custom-sprites\**\*" Condition="Exists('custom-sprites')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
   </ItemGroup>
 
