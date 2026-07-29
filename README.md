@@ -135,6 +135,8 @@ Gracias a [PKHeX.Core](https://github.com/kwsch/PKHeX) **26.x**:
 - Pokémon Scarlet/Violet
 
 > **Switch:** SwSh / PLA / SV → archivo `main` (sin extensión). BDSP vanilla → `SaveData.bin`. No uses save states del emulador.
+> **Juegos Oficiales Modificados:** Los juegos como `Pokemon Blaze Black 2 Redux`, `Pokemon Sinking Sapphire`, `Sacred Gold` o similares tambien son compatibles.
+> **Juegos Oficiales Randomizados:** Los juegos randomizados tambien son totalmente compatibles.
 
 ### Luminescent Platinum (PKLumiHex)
 
