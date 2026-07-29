@@ -51,7 +51,7 @@
                         </div>
                     </div>
 
-                    <div class="config-group">
+                    <div class="config-group" id="spacingGroup">
                         <div class="slider-header">
                             <label for="spacing">Espaciado</label>
                             <div class="slider-value">
@@ -60,6 +60,25 @@
                             </div>
                         </div>
                         <input type="range" id="spacing" min="0" max="100" value="8">
+                    </div>
+
+                    <div class="config-group" id="gridSpacingGroup" hidden>
+                        <div class="slider-header">
+                            <label for="gridRowGap">Espaciado entre filas</label>
+                            <div class="slider-value">
+                                <input type="number" id="gridRowGapInput" value="4" min="0" class="config-number">
+                                <span class="unit">px</span>
+                            </div>
+                        </div>
+                        <input type="range" id="gridRowGap" min="0" max="100" value="4">
+                        <div class="slider-header" style="margin-top:10px">
+                            <label for="gridColGap">Espaciado entre columnas</label>
+                            <div class="slider-value">
+                                <input type="number" id="gridColGapInput" value="4" min="0" class="config-number">
+                                <span class="unit">px</span>
+                            </div>
+                        </div>
+                        <input type="range" id="gridColGap" min="0" max="100" value="4">
                     </div>
 
                     <div class="config-group">
@@ -167,6 +186,14 @@
                             </div>
                         </div>
                         <input type="range" id="badgeSize" min="12" max="64" value="22">
+                        <label class="effect-toggle" style="margin-top:10px">
+                            <input type="checkbox" id="showBadgeLabels" checked>
+                            <span class="effect-toggle-ui"></span>
+                            <span class="effect-toggle-text">
+                                <strong>Mostrar títulos</strong>
+                                <small>Kanto, Dominantes, Paldea, etc.</small>
+                            </span>
+                        </label>
                         <label class="effect-toggle" style="margin-top:10px">
                             <input type="checkbox" id="badgeDimUnobtained" checked>
                             <span class="effect-toggle-ui"></span>

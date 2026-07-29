@@ -19,9 +19,12 @@ let config = {
     showBadges: false,
     badgeSize: 22,
     badgeDimUnobtained: true,
+    showBadgeLabels: true,
     nameOffsetY: 0,
     levelPosition: 'below',
     spacing: 8,
+    gridRowGap: 4,
+    gridColGap: 4,
     spriteSize: 48,
     fontFamily: 'Inter',
     fontSize: 11,
@@ -153,6 +156,8 @@ function generateOBSUrl() {
     params.set('layout', config.layout);
     params.set('sprite', normalizeCustomSpriteType(config.spriteType, config.customSpritePack));
     params.set('spacing', config.spacing);
+    params.set('gridrowgap', config.gridRowGap);
+    params.set('gridcolgap', config.gridColGap);
     params.set('size', config.spriteSize);
     params.set('font', config.fontFamily);
     params.set('fontsize', config.fontSize);
@@ -195,6 +200,7 @@ function generateBadgesOBSUrl() {
     params.set('uppercase', config.textUppercase ? '1' : '0');
     params.set('badgesize', config.badgeSize);
     params.set('badgedim', config.badgeDimUnobtained ? '1' : '0');
+    params.set('badgelabels', config.showBadgeLabels ? '1' : '0');
     params.set('clevel', config.colorLevel.replace('#', ''));
     return window.location.origin + '/?obs&' + params.toString();
 }
@@ -217,6 +223,8 @@ function loadConfigFromURL() {
         config.customSpritePack = getCustomSpritePack(config.spriteType);
     }
     if (p.has('spacing')) config.spacing = parseInt(p.get('spacing')) || 8;
+    if (p.has('gridrowgap')) config.gridRowGap = parseInt(p.get('gridrowgap')) || 4;
+    if (p.has('gridcolgap')) config.gridColGap = parseInt(p.get('gridcolgap')) || 4;
     if (p.has('size')) config.spriteSize = parseInt(p.get('size')) || 48;
     if (p.has('font')) config.fontFamily = p.get('font');
     if (p.has('fontsize')) config.fontSize = parseInt(p.get('fontsize')) || 11;
@@ -237,6 +245,7 @@ function loadConfigFromURL() {
     if (p.has('shiny')) config.showShiny = p.get('shiny') === '1';
     if (p.has('badgesize')) config.badgeSize = parseInt(p.get('badgesize')) || 22;
     if (p.has('badgedim')) config.badgeDimUnobtained = p.get('badgedim') === '1';
+    if (p.has('badgelabels')) config.showBadgeLabels = p.get('badgelabels') === '1';
     if (p.has('stroke')) config.textStroke = p.get('stroke') === '1';
     if (p.has('strokec')) config.strokeColor = '#' + p.get('strokec');
     if (p.has('strokew')) config.strokeWidth = parseFloat(p.get('strokew')) || 2;
@@ -502,6 +511,8 @@ function applyConfig() {
     const fxPad = getSpriteFxPadding();
     
     root.style.setProperty('--spacing', config.spacing + 'px');
+    root.style.setProperty('--grid-row-gap', config.gridRowGap + 'px');
+    root.style.setProperty('--grid-col-gap', config.gridColGap + 'px');
     root.style.setProperty('--sprite-size', config.spriteSize + 'px');
     root.style.setProperty('--badge-size', config.badgeSize + 'px');
     root.style.setProperty('--sprite-fx-pad', fxPad + 'px');
@@ -557,11 +568,22 @@ function applyConfig() {
         if (el('badgeSize')) el('badgeSize').value = config.badgeSize;
         if (el('badgeSizeInput')) el('badgeSizeInput').value = config.badgeSize;
         if (el('badgeDimUnobtained')) el('badgeDimUnobtained').checked = config.badgeDimUnobtained;
+        if (el('showBadgeLabels')) el('showBadgeLabels').checked = config.showBadgeLabels;
         toggleOptions('badgeOptions', true);
         if (el('nameOffsetY')) el('nameOffsetY').value = config.nameOffsetY;
         if (el('nameOffsetYInput')) el('nameOffsetYInput').value = config.nameOffsetY;
+        const isGridLayout = config.layout === 'grid-h' || config.layout === 'grid-v';
+        const spacingGroup = el('spacingGroup');
+        const gridSpacingGroup = el('gridSpacingGroup');
+        if (spacingGroup) spacingGroup.hidden = isGridLayout;
+        if (gridSpacingGroup) gridSpacingGroup.hidden = !isGridLayout;
+
         if (el('spacing')) el('spacing').value = config.spacing;
         if (el('spacingInput')) el('spacingInput').value = config.spacing;
+        if (el('gridRowGap')) el('gridRowGap').value = config.gridRowGap;
+        if (el('gridRowGapInput')) el('gridRowGapInput').value = config.gridRowGap;
+        if (el('gridColGap')) el('gridColGap').value = config.gridColGap;
+        if (el('gridColGapInput')) el('gridColGapInput').value = config.gridColGap;
         if (el('spriteSize')) el('spriteSize').value = config.spriteSize;
         if (el('spriteSizeInput')) el('spriteSizeInput').value = config.spriteSize;
         if (el('spriteType')) el('spriteType').value = config.spriteType;
@@ -660,6 +682,7 @@ function setupConfigListeners() {
     }
 
     bindCheckbox('badgeDimUnobtained', 'badgeDimUnobtained');
+    bindCheckbox('showBadgeLabels', 'showBadgeLabels');
     setupRangeInput('badgeSize', 'badgeSizeInput', 'badgeSize');
 
     setupRangeInput('nameOffsetY', 'nameOffsetYInput', 'nameOffsetY');
@@ -744,6 +767,8 @@ function setupConfigListeners() {
     }
     
     setupRangeInput('spacing', 'spacingInput', 'spacing');
+    setupRangeInput('gridRowGap', 'gridRowGapInput', 'gridRowGap');
+    setupRangeInput('gridColGap', 'gridColGapInput', 'gridColGap');
     setupRangeInput('spriteSize', 'spriteSizeInput', 'spriteSize');
     setupRangeInput('fontSize', 'fontSizeInput', 'fontSize');
 
@@ -1309,7 +1334,9 @@ function renderBadges(data) {
                 return config.badgeDimUnobtained;
             });
             if (!badges.length) return '';
-            const label = set.region ? `<span class="badge-set-label">${escapeHtml(set.region)}</span>` : '';
+            const label = config.showBadgeLabels && set.region
+                ? `<span class="badge-set-label">${escapeHtml(set.region)}</span>`
+                : '';
             const items = badges.map(b => {
                 const cls = b.obtained ? 'badge-item' : 'badge-item unobtained';
                 const url = buildBadgeUrl(b.spriteId);

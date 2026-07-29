@@ -4,6 +4,8 @@
 
 :root {
     --spacing: 8px;
+    --grid-row-gap: 4px;
+    --grid-col-gap: 4px;
     --sprite-size: 48px;
     --badge-size: 22px;
     --sprite-fx-pad: 8px;
@@ -909,19 +911,23 @@ input[type="range"]::-webkit-slider-thumb {
 /* Layout: 3|3 Horizontal (3 columnas × 2 filas) */
 .team-container.grid-h {
     display: grid;
-    grid-template-columns: repeat(3, auto);
+    grid-template-columns: repeat(3, max-content);
     grid-template-rows: repeat(2, auto);
-    align-items: center;
+    row-gap: var(--grid-row-gap);
+    column-gap: var(--grid-col-gap);
+    align-items: start;
     justify-items: center;
 }
 
 /* Layout: 3|3 Vertical (2 columnas × 3 filas) */
 .team-container.grid-v {
     display: grid;
-    grid-template-columns: repeat(2, auto);
+    grid-template-columns: repeat(2, max-content);
     grid-template-rows: repeat(3, auto);
     grid-auto-flow: column;
-    align-items: center;
+    row-gap: var(--grid-row-gap);
+    column-gap: var(--grid-col-gap);
+    align-items: start;
     justify-items: center;
 }
 

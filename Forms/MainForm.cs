@@ -39,6 +39,7 @@ public class MainForm : Form
     {
         InitializeComponent();
         StartHttpServer();
+        Shown += (_, _) => _ = CheckForUpdatesAsync(silentIfUpToDate: true);
     }
 
     private void InitializeComponent()
@@ -99,7 +100,7 @@ public class MainForm : Form
 
         var versionLabel = new Label
         {
-            Text = "v1.0",
+            Text = UpdateChecker.CurrentVersionDisplay,
             Font = new Font("Segoe UI", 10F),
             ForeColor = _accent,
             AutoSize = true,
@@ -118,6 +119,9 @@ public class MainForm : Form
         logoPanel.Controls.Add(titleLabel);
         logoPanel.Controls.Add(versionLabel);
         logoPanel.Controls.Add(subtitleLabel);
+
+        // Colocar la versión justo después del título
+        versionLabel.Location = new Point(titleLabel.PreferredWidth + 8, 15);
 
         // Botón Abrir Save
         _openSaveButton = new Button
@@ -259,6 +263,7 @@ public class MainForm : Form
 
         var trayMenu = new ContextMenuStrip();
         trayMenu.Items.Add("Abrir", null, (s, e) => { Show(); WindowState = FormWindowState.Normal; });
+        trayMenu.Items.Add("Buscar actualizaciones", null, (s, e) => _ = CheckForUpdatesAsync(silentIfUpToDate: false));
         trayMenu.Items.Add("-");
         trayMenu.Items.Add("Salir", null, (s, e) => { Application.Exit(); });
         _trayIcon.ContextMenuStrip = trayMenu;
@@ -942,5 +947,54 @@ public class MainForm : Form
         _httpListener?.Stop();
         _watcher?.Dispose();
         _trayIcon?.Dispose();
+    }
+
+    private async Task CheckForUpdatesAsync(bool silentIfUpToDate)
+    {
+        try
+        {
+            var update = await UpdateChecker.CheckForUpdateAsync();
+            if (IsDisposed)
+                return;
+
+            if (update is null)
+            {
+                if (!silentIfUpToDate && !IsDisposed)
+                {
+                    MessageBox.Show(
+                        this,
+                        $"Ya tienes la última versión ({UpdateChecker.CurrentVersionDisplay}).",
+                        "PokeLayout",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                }
+                return;
+            }
+
+            var latest = UpdateChecker.FormatVersion(update.LatestVersion);
+            var result = MessageBox.Show(
+                this,
+                $"Hay una nueva versión disponible: {latest}\n" +
+                $"Versión actual: {UpdateChecker.CurrentVersionDisplay}\n\n" +
+                "¿Abrir la página de descarga en GitHub?",
+                "Actualización disponible",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Information);
+
+            if (result == DialogResult.Yes)
+                UpdateChecker.OpenReleasePage(update.HtmlUrl);
+        }
+        catch
+        {
+            if (!silentIfUpToDate && !IsDisposed)
+            {
+                MessageBox.Show(
+                    this,
+                    "No se pudo comprobar si hay actualizaciones.\nComprueba tu conexión a internet.",
+                    "PokeLayout",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+            }
+        }
     }
 }
