@@ -136,6 +136,10 @@ Gracias a [PKHeX.Core](https://github.com/kwsch/PKHeX) **26.x**:
 
 > **Switch:** SwSh / PLA / SV → archivo `main` (sin extensión). BDSP vanilla → `SaveData.bin`. No uses save states del emulador.
 
+> **Juegos Oficiales Modificados:** Los juegos como `Pokemon Luminescent Platinum`, `Pokemon Blaze Black 2 Redux`, `Pokemon Sinking Sapphire`, `Pokemon Sacred Gold` o similares tambien son compatibles.
+
+> **Juegos Oficiales Randomizados:** Los juegos randomizados tambien son totalmente compatibles.
+
 ### Luminescent Platinum (PKLumiHex)
 
 El romhack [Luminescent Platinum](https://luminescent.team/) usa un formato de save distinto al BDSP oficial. PokeLayout lo lee con el Core de [PKLumiHex](https://github.com/TalonSabre/PKLumiHex) cargado como plugin aislado:
