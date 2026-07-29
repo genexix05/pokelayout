@@ -1,0 +1,3 @@
+[submodule "deps/PKLumiHex"]
+	path = deps/PKLumiHex
+	url = https://github.com/TalonSabre/PKLumiHex.git

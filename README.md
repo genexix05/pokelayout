@@ -23,7 +23,9 @@ Overlay leyendo un save de **Pokémon Essentials** (`.rxdata`) en tiempo real:
   - Tamaño de sprites y espaciado ajustable
 - ✨ **Indicador de Shiny** con brillo especial
 - 💀 **Pokémon debilitados** se muestran en blanco y negro
-- 🎮 **Juegos oficiales** — PKHeX.Core (`.sav`, `.dsv`, etc.)
+- 🎮 **Juegos oficiales** — PKHeX.Core (`.sav`, `.dsv`, Switch `main`/`backup`, etc.)
+- 🕹️ **Nintendo Switch** — Sword/Shield, BDSP, Legends Arceus, Scarlet/Violet (`main`) y BDSP/Lumi (`SaveData.bin`)
+- 💎 **Luminescent Platinum** — Saves del romhack vía [PKLumiHex](https://github.com/TalonSabre/PKLumiHex) (fallback automático)
 - 🛠️ **Fan games Essentials** — Saves de RPG Maker (`.rxdata`, `.rvdata`)
 
 ## 📋 Requisitos
@@ -47,9 +49,9 @@ Overlay leyendo un save de **Pokémon Essentials** (`.rxdata`) en tiempo real:
 
 ### 1. Ejecutar PokeLayout
 
-Abre `pokelayout.exe` y haz clic en **"Abrir archivo .sav"** para seleccionar tu archivo de guardado.
+Abre `pokelayout.exe` y haz clic en **"Abrir archivo de guardado"** para seleccionar tu archivo.
 
-**Formatos soportados:** `.sav`, `.dsv`, `.dat`, `.gci`, `.sa1`, `.sa2`, `.rxdata`, `.rvdata`, `.rvdata2`
+**Formatos soportados:** `main`, `backup`, `.sav`, `.dsv`, `.dat`, `.bin`, `.gci`, `.sa1`, `.sa2`, `.rxdata`, `.rvdata`, `.rvdata2`
 
 **Ubicaciones comunes de saves:**
 
@@ -59,6 +61,9 @@ Abre `pokelayout.exe` y haz clic en **"Abrir archivo .sav"** para seleccionar tu
 | DeSmuME | Misma carpeta que la ROM (`.dsv`) |
 | Citra | `%APPDATA%\Citra\sdmc\Nintendo 3DS\...` |
 | melonDS | Misma carpeta que la ROM |
+| Ryujinx | `%APPDATA%\Ryujinx\bis\user\save\...` → archivo **`main`** |
+| Yuzu / Sudachi / Eden | Carpeta de save del juego → **`main`** (SwSh/PLA/SV) o **`SaveData.bin`** (BDSP / Luminescent) |
+| Switch (CFW) | Extraído con **JKSV** o **Checkpoint** → archivo **`main`** o **`SaveData.bin`** |
 | Pokémon Essentials (mkxp) | `%APPDATA%\GAMENAME\Game.rxdata` o carpeta del juego |
 
 ### 2. Configurar el overlay
@@ -111,7 +116,7 @@ Los sprites de [PokeAPI](https://github.com/PokeAPI/sprites) soportan variantes 
 
 ### Juegos oficiales (PKHeX)
 
-Gracias a [PKHeX.Core](https://github.com/kwsch/PKHeX):
+Gracias a [PKHeX.Core](https://github.com/kwsch/PKHeX) **26.x**:
 
 - Pokémon Rojo/Azul/Amarillo
 - Pokémon Oro/Plata/Cristal
@@ -129,6 +134,18 @@ Gracias a [PKHeX.Core](https://github.com/kwsch/PKHeX):
 - Pokémon Legends: Arceus
 - Pokémon Scarlet/Violet
 
+> **Switch:** SwSh / PLA / SV → archivo `main` (sin extensión). BDSP vanilla → `SaveData.bin`. No uses save states del emulador.
+
+### Luminescent Platinum (PKLumiHex)
+
+El romhack [Luminescent Platinum](https://luminescent.team/) usa un formato de save distinto al BDSP oficial. PokeLayout lo lee con el Core de [PKLumiHex](https://github.com/TalonSabre/PKLumiHex) cargado como plugin aislado:
+
+1. En Eden / Yuzu / Ryujinx: clic derecho en el juego → abrir carpeta de save
+2. Selecciona **`SaveData.bin`** (Title ID BD: `0100000011D90000`)
+3. Si PKHeX oficial no lo reconoce, se intenta automáticamente el fallback Lumi
+
+> Solo lectura para el overlay (no edita el save). Haz backup antes de tocar el archivo con otros editores.
+
 ### Fan games (Pokémon Essentials / RPG Maker)
 
 Saves `.rxdata`, `.rvdata` y `.rvdata2` de juegos hechos con **Pokémon Essentials** (RPG Maker XP/VX):
@@ -143,30 +160,35 @@ Saves `.rxdata`, `.rvdata` y `.rvdata2` de juegos hechos con **Pokémon Essentia
 
 Requisitos:
 
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - Windows (Windows Forms)
+- Git (para el submodule de PKLumiHex)
 
 ```bash
-# Clonar repositorio
-git clone https://github.com/genexix05/pokelayout.git
+# Clonar repositorio con submodules
+git clone --recurse-submodules https://github.com/genexix05/pokelayout.git
 cd pokelayout
 
-# Compilar (desarrollo)
+# Si ya clonaste sin submodules:
+git submodule update --init --recursive
+
+# Compilar (desarrollo) — también genera plugins/pklumihex/PKHeX.Core.dll
 dotnet build
 
 # Publicar ejecutable autocontenido para distribución
 dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o ./dist
 ```
 
-Comprime la carpeta `dist/` completa para distribuir el release.
+Comprime la carpeta `dist/` completa (incluye `plugins/pklumihex/`) para distribuir el release.
 
 ## 📝 Licencia
 
-Este proyecto es de código abierto. Usa [PKHeX.Core](https://github.com/kwsch/PKHeX) bajo su licencia GPLv3.
+Este proyecto es de código abierto. Usa [PKHeX.Core](https://github.com/kwsch/PKHeX) y el Core de [PKLumiHex](https://github.com/TalonSabre/PKLumiHex) bajo licencia GPLv3.
 
 ## 🙏 Créditos
 
 - [PKHeX](https://github.com/kwsch/PKHeX) — Lectura de saves oficiales
+- [PKLumiHex](https://github.com/TalonSabre/PKLumiHex) — Lectura de saves Luminescent Platinum
 - [PokeAPI Sprites](https://github.com/PokeAPI/sprites) — Sprites por generación
 - [PMD Collab / SpriteCollab](https://pmdcollab.org/) — Portraits Mystery Dungeon (CC BY-NC)
 - Sprites oficiales de Nintendo/Game Freak/The Pokémon Company

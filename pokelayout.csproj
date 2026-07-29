@@ -2,16 +2,18 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>PokeLayout</RootNamespace>
     <ApplicationIcon>icon.ico</ApplicationIcon>
+    <!-- No compilar el submodule de PKLumiHex dentro de este proyecto -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);deps\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="PKHeX.Core" Version="24.11.11" />
+    <PackageReference Include="PKHeX.Core" Version="26.7.7" />
   </ItemGroup>
 
   <ItemGroup>
@@ -25,5 +27,61 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+
+  <!-- PKLumiHex Core (net8) → plugins/pklumihex para carga vía AssemblyLoadContext -->
+  <PropertyGroup>
+    <LumiCoreProject>$(MSBuildThisFileDirectory)deps\PKLumiHex\PKHeX.Core\PKHeX.Core.csproj</LumiCoreProject>
+    <LumiPluginDir>$(MSBuildThisFileDirectory)plugins\pklumihex</LumiPluginDir>
+    <LumiPluginDll>$(LumiPluginDir)\PKHeX.Core.dll</LumiPluginDll>
+  </PropertyGroup>
+
+  <Target Name="BuildLumiPlugin" BeforeTargets="BeforeBuild"
+          Condition="Exists('$(LumiCoreProject)')">
+    <Message Importance="high" Text="Compilando PKLumiHex.Core para plugins/pklumihex..." />
+    <!-- Sin RID: el -r win-x64 del publish no debe meter el DLL en net8.0/win-x64/ -->
+    <MSBuild Projects="$(LumiCoreProject)"
+             Targets="Restore;Build"
+             Properties="Configuration=$(Configuration);BuildProjectReferences=false;RuntimeIdentifier=;SelfContained=false" />
+    <PropertyGroup>
+      <_LumiBuiltDir>$(MSBuildThisFileDirectory)deps\PKLumiHex\PKHeX.Core\bin\$(Configuration)\net8.0\</_LumiBuiltDir>
+      <_LumiBuiltDir Condition="!Exists('$(_LumiBuiltDir)PKHeX.Core.dll') and '$(RuntimeIdentifier)' != ''">$(MSBuildThisFileDirectory)deps\PKLumiHex\PKHeX.Core\bin\$(Configuration)\net8.0\$(RuntimeIdentifier)\</_LumiBuiltDir>
+    </PropertyGroup>
+    <Error Condition="!Exists('$(_LumiBuiltDir)PKHeX.Core.dll')"
+           Text="No se encontró PKLumiHex.Core en '$(_LumiBuiltDir)'. Revisa el submodule deps/PKLumiHex." />
+    <ItemGroup>
+      <_LumiBuilt Include="$(_LumiBuiltDir)PKHeX.Core.dll" />
+      <_LumiBuilt Include="$(_LumiBuiltDir)PKHeX.Core.pdb"
+                  Condition="Exists('$(_LumiBuiltDir)PKHeX.Core.pdb')" />
+    </ItemGroup>
+    <MakeDir Directories="$(LumiPluginDir)" />
+    <Copy SourceFiles="@(_LumiBuilt)" DestinationFolder="$(LumiPluginDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyLumiPluginToOutput" AfterTargets="Build"
+          Condition="Exists('$(LumiPluginDll)')">
+    <MakeDir Directories="$(OutputPath)plugins\pklumihex" />
+    <ItemGroup>
+      <_LumiPluginFiles Include="$(LumiPluginDir)\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_LumiPluginFiles)"
+          DestinationFolder="$(OutputPath)plugins\pklumihex"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyLumiPluginToPublish" AfterTargets="Publish"
+          Condition="Exists('$(LumiPluginDll)')">
+    <MakeDir Directories="$(PublishDir)plugins\pklumihex" />
+    <ItemGroup>
+      <_LumiPluginPublish Include="$(LumiPluginDir)\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_LumiPluginPublish)"
+          DestinationFolder="$(PublishDir)plugins\pklumihex"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="WarnMissingLumiPlugin" BeforeTargets="BeforeBuild"
+          Condition="!Exists('$(LumiCoreProject)')">
+    <Warning Text="No se encontró deps/PKLumiHex. Ejecuta: git submodule update --init --recursive. El fallback Luminescent no estará disponible." />
+  </Target>
 
 </Project>

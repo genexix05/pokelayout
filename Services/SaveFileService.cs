@@ -48,14 +48,15 @@ public class SaveFileService
 
             var data = File.ReadAllBytes(filePath);
             var ext = Path.GetExtension(filePath).ToLowerInvariant();
+            var fileName = Path.GetFileName(filePath);
 
             TeamData? team = IsRxData(ext, data)
                 ? ReadEssentialsSave(data, filePath)
-                : ReadPkhexSave(data);
+                : ReadPkhexSave(data, filePath);
 
             if (team == null)
             {
-                Console.WriteLine("[SaveFileService] No se pudo leer el archivo de guardado");
+                Console.WriteLine($"[SaveFileService] No se pudo leer el archivo de guardado ({fileName})");
                 return null;
             }
 
@@ -82,15 +83,52 @@ public class SaveFileService
         return data.Length >= 2 && data[0] == 0x04 && data[1] == 0x08;
     }
 
-    private static TeamData? ReadPkhexSave(byte[] data)
+    private static TeamData? ReadPkhexSave(byte[] data, string filePath)
     {
-        var sav = SaveUtil.GetVariantSAV(data);
-        if (sav == null)
-            return null;
+        // Preferir carga por ruta: PKHeX detecta mejor algunos dumps de Switch (main/backup)
+        SaveFile? sav = null;
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(filePath) && File.Exists(filePath))
+                sav = SaveUtil.GetSaveFile(filePath);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SaveFileService] GetSaveFile(path) falló: {ex.Message}");
+        }
 
+        try
+        {
+            sav ??= SaveUtil.GetSaveFile(data, filePath);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SaveFileService] GetSaveFile(data) falló: {ex.Message}");
+        }
+
+        // Algunos dumps de emulador traen padding; probar tamaños típicos de Switch
+        if (sav == null)
+            sav = TryLoadSwitchSizedSave(data, filePath);
+
+        if (sav != null)
+            return BuildTeamFromSave(sav);
+
+        // Luminescent Platinum / forks: PKHeX oficial no los reconoce
+        if (LumiSaveBridge.IsLumiCandidate(data, filePath))
+        {
+            var lumi = LumiSaveBridge.TryRead(data, filePath);
+            if (lumi != null)
+                return lumi;
+        }
+
+        return null;
+    }
+
+    private static TeamData BuildTeamFromSave(SaveFile sav)
+    {
         var team = new TeamData
         {
-            GameVersion = sav.Version.ToString(),
+            GameVersion = FormatGameVersion(sav),
             TrainerName = sav.OT,
             LastUpdated = DateTime.Now
         };
@@ -121,6 +159,51 @@ public class SaveFileService
         }
 
         return team;
+    }
+
+    /// <summary>
+    /// Intenta recortar dumps con bytes extra (algunos backups de Switch/emulador).
+    /// </summary>
+    private static SaveFile? TryLoadSwitchSizedSave(byte[] data, string? filePath)
+    {
+        if (data.Length < 0x10000)
+            return null;
+
+        // Reintento: a veces hay footer de emulador al final (pocos KB)
+        foreach (var trim in new[] { 0x4, 0x10, 0x100, 0x200, 0x1000 })
+        {
+            if (data.Length <= trim) continue;
+            try
+            {
+                var slice = data.AsSpan(0, data.Length - trim).ToArray();
+                var sav = SaveUtil.GetSaveFile(slice, filePath);
+                if (sav != null)
+                {
+                    Console.WriteLine($"[SaveFileService] Save leído tras recortar {trim} bytes del final");
+                    return sav;
+                }
+            }
+            catch { }
+        }
+
+        return null;
+    }
+
+    private static string FormatGameVersion(SaveFile sav)
+    {
+        try
+        {
+            var version = sav.Version.ToString();
+            var gen = sav.Generation;
+            // Switch: Gen 8 (SwSh/BDSP/LA) y Gen 9 (SV)
+            if (gen is 8 or 9)
+                return $"{version} (Switch / Gen {gen})";
+            return version;
+        }
+        catch
+        {
+            return sav.Version.ToString();
+        }
     }
 
     private static TeamData? ReadEssentialsSave(byte[] data, string filePath)

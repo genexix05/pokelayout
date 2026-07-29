@@ -26,6 +26,9 @@ _parse_rxdata.py
 # User-imported fonts (runtime)
 custom-fonts/
 
+# PKLumiHex plugin output (regenerated from submodule on build)
+plugins/pklumihex/
+
 # OS
 Thumbs.db
 .DS_Store

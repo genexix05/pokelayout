@@ -122,7 +122,7 @@ public class MainForm : Form
         // Botón Abrir Save
         _openSaveButton = new Button
         {
-            Text = "  Abrir archivo .sav",
+            Text = "  Abrir archivo de guardado",
             Size = new Size(200, 44),
             Location = new Point(30, 95),
             FlatStyle = FlatStyle.Flat,
@@ -349,8 +349,16 @@ public class MainForm : Form
         using var openFileDialog = new OpenFileDialog
         {
             Title = "Selecciona tu archivo de guardado",
-            Filter = "Archivos Save|*.sav;*.dsv;*.dat;*.gci;*.sa1;*.sa2;*.rxdata;*.rvdata;*.rvdata2|RPG Maker / Essentials|*.rxdata;*.rvdata;*.rvdata2|Todos los archivos|*.*",
-            FilterIndex = 1
+            Filter =
+                "Todos los saves|main;backup;SaveData.bin;*.sav;*.dsv;*.dat;*.bin;*.gci;*.sa1;*.sa2;*.rxdata;*.rvdata;*.rvdata2|" +
+                "Nintendo Switch (main/backup/SaveData.bin)|main;backup;SaveData.bin;*.bin|" +
+                "Emuladores clásicos|*.sav;*.dsv;*.dat;*.gci;*.sa1;*.sa2|" +
+                "RPG Maker / Essentials|*.rxdata;*.rvdata;*.rvdata2|" +
+                "Todos los archivos|*.*",
+            FilterIndex = 1,
+            CheckFileExists = true,
+            // Permite elegir archivos sin extensión (main / backup de Switch)
+            SupportMultiDottedExtensions = true
         };
 
         if (openFileDialog.ShowDialog() == DialogResult.OK)
@@ -396,6 +404,16 @@ public class MainForm : Form
 
         _watcher.Changed += OnSaveFileChanged;
         _watcher.Created += OnSaveFileChanged;
+        _watcher.Renamed += OnSaveFileRenamed;
+    }
+
+    private void OnSaveFileRenamed(object sender, RenamedEventArgs e)
+    {
+        // Emuladores / JKSV a veces renombran temp → main
+        if (!string.Equals(e.FullPath, _savePath, StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(e.Name, Path.GetFileName(_savePath), StringComparison.OrdinalIgnoreCase))
+            return;
+        OnSaveFileChanged(sender, e);
     }
 
     private void OnSaveFileChanged(object sender, FileSystemEventArgs e)
