@@ -207,46 +207,90 @@ internal static class LumiSaveBridge
                 break;
             slot++;
 
-            var pkType = pk.GetType();
-            var species = Convert.ToInt32(pkType.GetProperty("Species")?.GetValue(pk) ?? 0);
-            if (species == 0)
-                continue;
-
-            var nickname = pkType.GetProperty("Nickname")?.GetValue(pk)?.ToString() ?? "";
-            var isNicknamed = Convert.ToBoolean(pkType.GetProperty("IsNicknamed")?.GetValue(pk) ?? false);
-            var level = Convert.ToInt32(pkType.GetProperty("CurrentLevel")?.GetValue(pk) ?? 0);
-            var isShiny = Convert.ToBoolean(pkType.GetProperty("IsShiny")?.GetValue(pk) ?? false);
-            var isEgg = Convert.ToBoolean(pkType.GetProperty("IsEgg")?.GetValue(pk) ?? false);
-            var form = Convert.ToInt32(pkType.GetProperty("Form")?.GetValue(pk) ?? 0);
-            var gender = Convert.ToInt32(pkType.GetProperty("Gender")?.GetValue(pk) ?? 2);
-            var hpCur = Convert.ToInt32(pkType.GetProperty("Stat_HPCurrent")?.GetValue(pk) ?? 0);
-            var hpMax = Convert.ToInt32(pkType.GetProperty("Stat_HPMax")?.GetValue(pk) ?? 0);
-            var heldItem = Convert.ToInt32(pkType.GetProperty("HeldItem")?.GetValue(pk) ?? 0);
-
-            var speciesName = GetSpeciesNameFromLumi(species) ?? GetSpeciesNameOfficial(species);
-
-            team.Team.Add(new PokemonData
-            {
-                Slot = slot,
-                Species = species,
-                SpeciesName = speciesName,
-                SpeciesKey = NormalizeSpeciesKey(speciesName),
-                Nickname = nickname,
-                HasNickname = isNicknamed,
-                Level = level,
-                IsShiny = isShiny,
-                IsEgg = isEgg,
-                Form = form,
-                Gender = gender,
-                CurrentHP = hpCur,
-                MaxHP = hpMax,
-                HeldItem = GetItemNameOfficial(heldItem),
-                SpriteUrl = GetSpriteUrl(species, isShiny)
-            });
+            var poke = TryBuildPokemonFromLumiPk(pk, slot);
+            if (poke != null)
+                team.Team.Add(poke);
         }
 
+        FillCemeteryFromLumi(sav, team);
         team.BadgeSets = TryReadBdspBadges(sav);
         return team;
+    }
+
+    private static void FillCemeteryFromLumi(object sav, TeamData team)
+    {
+        try
+        {
+            var savType = sav.GetType();
+            var hasBox = Convert.ToBoolean(savType.GetProperty("HasBox")?.GetValue(sav) ?? false);
+            var boxCount = Convert.ToInt32(savType.GetProperty("BoxCount")?.GetValue(sav) ?? 0);
+            if (!hasBox || boxCount <= 0)
+                return;
+
+            var lastBox = boxCount - 1;
+            team.CemeteryBoxIndex = lastBox;
+
+            var getBoxData = savType.GetMethod("GetBoxData", [typeof(int)]);
+            if (getBoxData == null)
+                return;
+
+            if (getBoxData.Invoke(sav, [lastBox]) is not System.Collections.IEnumerable box)
+                return;
+
+            int slot = 0;
+            foreach (var pk in box)
+            {
+                slot++;
+                if (pk == null) continue;
+                var poke = TryBuildPokemonFromLumiPk(pk, slot);
+                if (poke != null)
+                    team.Cemetery.Add(poke);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[LumiSaveBridge] Cementerio: {ex.Message}");
+        }
+    }
+
+    private static PokemonData? TryBuildPokemonFromLumiPk(object pk, int slot)
+    {
+        var pkType = pk.GetType();
+        var species = Convert.ToInt32(pkType.GetProperty("Species")?.GetValue(pk) ?? 0);
+        if (species == 0)
+            return null;
+
+        var nickname = pkType.GetProperty("Nickname")?.GetValue(pk)?.ToString() ?? "";
+        var isNicknamed = Convert.ToBoolean(pkType.GetProperty("IsNicknamed")?.GetValue(pk) ?? false);
+        var level = Convert.ToInt32(pkType.GetProperty("CurrentLevel")?.GetValue(pk) ?? 0);
+        var isShiny = Convert.ToBoolean(pkType.GetProperty("IsShiny")?.GetValue(pk) ?? false);
+        var isEgg = Convert.ToBoolean(pkType.GetProperty("IsEgg")?.GetValue(pk) ?? false);
+        var form = Convert.ToInt32(pkType.GetProperty("Form")?.GetValue(pk) ?? 0);
+        var gender = Convert.ToInt32(pkType.GetProperty("Gender")?.GetValue(pk) ?? 2);
+        var hpCur = Convert.ToInt32(pkType.GetProperty("Stat_HPCurrent")?.GetValue(pk) ?? 0);
+        var hpMax = Convert.ToInt32(pkType.GetProperty("Stat_HPMax")?.GetValue(pk) ?? 0);
+        var heldItem = Convert.ToInt32(pkType.GetProperty("HeldItem")?.GetValue(pk) ?? 0);
+
+        var speciesName = GetSpeciesNameFromLumi(species) ?? GetSpeciesNameOfficial(species);
+
+        return new PokemonData
+        {
+            Slot = slot,
+            Species = species,
+            SpeciesName = speciesName,
+            SpeciesKey = NormalizeSpeciesKey(speciesName),
+            Nickname = nickname,
+            HasNickname = isNicknamed,
+            Level = level,
+            IsShiny = isShiny,
+            IsEgg = isEgg,
+            Form = form,
+            Gender = gender,
+            CurrentHP = hpCur,
+            MaxHP = hpMax,
+            HeldItem = GetItemNameOfficial(heldItem),
+            SpriteUrl = GetSpriteUrl(species, isShiny)
+        };
     }
 
     private static List<BadgeSetData> TryReadBdspBadges(object sav)

@@ -8,6 +8,11 @@ const API_URL = '/api/team';
 let currentTeam = null;
 let customFonts = []; // { family, fileName }
 let customSpritePacks = []; // { id, folders, hasFormsFile }
+let deathAnimTimer = null;
+let deathAnimHideTimer = null;
+const DEATH_ANIM_HOLD_MS = 4500;
+const DEATH_ANIM_FADE_MS = 700;
+
 let config = {
     layout: 'horizontal',
     spriteType: 'default',
@@ -16,10 +21,16 @@ let config = {
     showLevel: true,
     showHP: false,
     showShiny: true,
+    deathAnimation: false,
     showBadges: false,
     badgeSize: 22,
     badgeDimUnobtained: true,
     showBadgeLabels: true,
+    showCemetery: false,
+    cemeterySpriteType: 'default',
+    cemeteryColumns: 5,
+    cemeterySpriteSize: 40,
+    cemeteryGrayscale: true,
     nameOffsetY: 0,
     levelPosition: 'below',
     spacing: 8,
@@ -136,9 +147,20 @@ function isOBSMode() {
     return new URLSearchParams(window.location.search).has('obs');
 }
 
+function getObsView() {
+    return new URLSearchParams(window.location.search).get('view') || '';
+}
+
 function isBadgesOnlyMode() {
-    const view = new URLSearchParams(window.location.search).get('view');
-    return isOBSMode() && view === 'badges';
+    return isOBSMode() && getObsView() === 'badges';
+}
+
+function isDeathOnlyMode() {
+    return isOBSMode() && getObsView() === 'death';
+}
+
+function isCemeteryOnlyMode() {
+    return isOBSMode() && getObsView() === 'cemetery';
 }
 
 function shouldShowBadges() {
@@ -147,8 +169,51 @@ function shouldShowBadges() {
     return config.showBadges;
 }
 
+function shouldShowCemetery() {
+    if (isCemeteryOnlyMode()) return true;
+    if (isOBSMode()) return false;
+    return config.showCemetery;
+}
+
 function shouldShowTeam() {
-    return !isBadgesOnlyMode();
+    return !isBadgesOnlyMode() && !isDeathOnlyMode() && !isCemeteryOnlyMode();
+}
+
+function shouldPlayDeathAnimation() {
+    if (isBadgesOnlyMode() || isCemeteryOnlyMode()) return false;
+    // Fuente OBS dedicada, o vista previa en el panel de configuración
+    if (isDeathOnlyMode()) return true;
+    return !isOBSMode() && config.deathAnimation;
+}
+
+function withSpriteType(typeKey, fn) {
+    const prevType = config.spriteType;
+    const prevPack = config.customSpritePack;
+    config.spriteType = typeKey || 'default';
+    if (isCustomSpriteType(config.spriteType)) {
+        config.customSpritePack = getCustomSpritePack(config.spriteType);
+    }
+    try {
+        return fn();
+    } finally {
+        config.spriteType = prevType;
+        config.customSpritePack = prevPack;
+    }
+}
+
+async function withSpriteTypeAsync(typeKey, fn) {
+    const prevType = config.spriteType;
+    const prevPack = config.customSpritePack;
+    config.spriteType = typeKey || 'default';
+    if (isCustomSpriteType(config.spriteType)) {
+        config.customSpritePack = getCustomSpritePack(config.spriteType);
+    }
+    try {
+        return await fn();
+    } finally {
+        config.spriteType = prevType;
+        config.customSpritePack = prevPack;
+    }
 }
 
 function generateOBSUrl() {
@@ -205,27 +270,93 @@ function generateBadgesOBSUrl() {
     return window.location.origin + '/?obs&' + params.toString();
 }
 
+function generateDeathOBSUrl() {
+    const params = new URLSearchParams();
+    params.set('view', 'death');
+    params.set('sprite', normalizeCustomSpriteType(config.spriteType, config.customSpritePack));
+    params.set('size', config.spriteSize);
+    params.set('font', config.fontFamily);
+    params.set('fontsize', config.fontSize);
+    params.set('uppercase', config.textUppercase ? '1' : '0');
+    params.set('cname', config.colorName.replace('#', ''));
+    params.set('cnick', config.colorNickname.replace('#', ''));
+    params.set('shiny', config.showShiny ? '1' : '0');
+    params.set('stroke', config.textStroke ? '1' : '0');
+    params.set('strokec', config.strokeColor.replace('#', ''));
+    params.set('strokew', config.strokeWidth);
+    params.set('tshadow', config.textShadow ? '1' : '0');
+    params.set('tsc', config.textShadowColor.replace('#', ''));
+    params.set('tsx', config.textShadowX);
+    params.set('tsy', config.textShadowY);
+    params.set('tsb', config.textShadowBlur);
+    params.set('sstroke', config.spriteStroke ? '1' : '0');
+    params.set('sstrokec', config.spriteStrokeColor.replace('#', ''));
+    params.set('sstrokew', config.spriteStrokeWidth);
+    return window.location.origin + '/?obs&' + params.toString();
+}
+
+function generateCemeteryOBSUrl() {
+    const params = new URLSearchParams();
+    params.set('view', 'cemetery');
+    params.set('sprite', normalizeCustomSpriteType(config.cemeterySpriteType, getCustomSpritePack(config.cemeterySpriteType)));
+    params.set('size', config.cemeterySpriteSize);
+    params.set('cols', config.cemeteryColumns);
+    params.set('gray', config.cemeteryGrayscale ? '1' : '0');
+    params.set('bg', config.background);
+    return window.location.origin + '/?obs&' + params.toString();
+}
+
 function updateOBSUrlField() {
     const teamUrl = document.getElementById('obsUrl');
     const badgesUrl = document.getElementById('obsBadgesUrl');
+    const deathUrl = document.getElementById('obsDeathUrl');
+    const deathGroup = document.getElementById('obsDeathUrlGroup');
+    const cemeteryUrl = document.getElementById('obsCemeteryUrl');
     if (teamUrl) teamUrl.value = generateOBSUrl();
     if (badgesUrl) badgesUrl.value = generateBadgesOBSUrl();
+    if (deathUrl) deathUrl.value = generateDeathOBSUrl();
+    if (deathGroup) deathGroup.hidden = !config.deathAnimation;
+    if (cemeteryUrl) cemeteryUrl.value = generateCemeteryOBSUrl();
 }
 
 function loadConfigFromURL() {
     const p = new URLSearchParams(window.location.search);
     if (p.get('view') === 'badges') config.showBadges = true;
+    if (p.get('view') === 'death') config.deathAnimation = true;
+    if (p.get('view') === 'cemetery') config.showCemetery = true;
     if (p.has('layout')) config.layout = p.get('layout');
-    if (p.has('sprite')) config.spriteType = p.get('sprite');
+    if (p.has('sprite')) {
+        const sprite = p.get('sprite');
+        if (isCemeteryOnlyMode()) {
+            config.cemeterySpriteType = sprite;
+            if (isCustomSpriteType(sprite)) {
+                config.cemeterySpriteType = normalizeCustomSpriteType(sprite, config.customSpritePack);
+            }
+        } else {
+            config.spriteType = sprite;
+        }
+    }
     if (p.has('cspritepack')) config.customSpritePack = p.get('cspritepack');
     if (isCustomSpriteType(config.spriteType)) {
         config.spriteType = normalizeCustomSpriteType(config.spriteType, config.customSpritePack);
         config.customSpritePack = getCustomSpritePack(config.spriteType);
     }
+    if (isCustomSpriteType(config.cemeterySpriteType)) {
+        config.cemeterySpriteType = normalizeCustomSpriteType(config.cemeterySpriteType, getCustomSpritePack(config.cemeterySpriteType));
+    }
     if (p.has('spacing')) config.spacing = parseInt(p.get('spacing')) || 8;
     if (p.has('gridrowgap')) config.gridRowGap = parseInt(p.get('gridrowgap')) || 4;
     if (p.has('gridcolgap')) config.gridColGap = parseInt(p.get('gridcolgap')) || 4;
-    if (p.has('size')) config.spriteSize = parseInt(p.get('size')) || 48;
+    if (p.has('size')) {
+        const size = parseInt(p.get('size')) || (isCemeteryOnlyMode() ? 40 : 48);
+        if (isCemeteryOnlyMode()) config.cemeterySpriteSize = size;
+        else config.spriteSize = size;
+    }
+    if (p.has('cols')) {
+        const cols = parseInt(p.get('cols'), 10);
+        if ([5, 7, 9].includes(cols)) config.cemeteryColumns = cols;
+    }
+    if (p.has('gray')) config.cemeteryGrayscale = p.get('gray') === '1';
     if (p.has('font')) config.fontFamily = p.get('font');
     if (p.has('fontsize')) config.fontSize = parseInt(p.get('fontsize')) || 11;
     if (p.has('uppercase')) config.textUppercase = p.get('uppercase') === '1';
@@ -277,6 +408,16 @@ function loadConfig() {
                 config.spriteType = normalizeCustomSpriteType(config.spriteType, config.customSpritePack);
                 config.customSpritePack = getCustomSpritePack(config.spriteType);
             }
+            if (!config.cemeterySpriteType) config.cemeterySpriteType = 'default';
+            if (isCustomSpriteType(config.cemeterySpriteType)) {
+                config.cemeterySpriteType = normalizeCustomSpriteType(
+                    config.cemeterySpriteType,
+                    getCustomSpritePack(config.cemeterySpriteType)
+                );
+            }
+            if (![5, 7, 9].includes(config.cemeteryColumns)) config.cemeteryColumns = 5;
+            if (!config.cemeterySpriteSize) config.cemeterySpriteSize = 40;
+            if (typeof config.cemeteryGrayscale !== 'boolean') config.cemeteryGrayscale = true;
         } catch (e) {}
     }
 }
@@ -508,6 +649,7 @@ function applyConfig() {
     const container = document.getElementById('team');
     const teamWrapper = document.getElementById('teamWrapper');
     const badgesWrapper = document.getElementById('badgesWrapper');
+    const cemeteryWrapper = document.getElementById('cemeteryWrapper');
     const fxPad = getSpriteFxPadding();
     
     root.style.setProperty('--spacing', config.spacing + 'px');
@@ -515,6 +657,8 @@ function applyConfig() {
     root.style.setProperty('--grid-col-gap', config.gridColGap + 'px');
     root.style.setProperty('--sprite-size', config.spriteSize + 'px');
     root.style.setProperty('--badge-size', config.badgeSize + 'px');
+    root.style.setProperty('--cemetery-cols', String(config.cemeteryColumns || 5));
+    root.style.setProperty('--cemetery-sprite-size', (config.cemeterySpriteSize || 40) + 'px');
     root.style.setProperty('--sprite-fx-pad', fxPad + 'px');
     root.style.setProperty('--font-family', `'${config.fontFamily}', sans-serif`);
     root.style.setProperty('--font-size', config.fontSize + 'px');
@@ -544,8 +688,15 @@ function applyConfig() {
         if (config.background !== 'transparent') badgesWrapper.classList.add('bg-' + config.background);
         if (isBadgesOnlyMode()) badgesWrapper.hidden = false;
     }
+    if (cemeteryWrapper) {
+        cemeteryWrapper.className = 'cemetery-wrapper';
+        if (config.background !== 'transparent') cemeteryWrapper.classList.add('bg-' + config.background);
+        if (isCemeteryOnlyMode()) cemeteryWrapper.hidden = false;
+    }
     
     document.body.classList.toggle('obs-badges-only', isBadgesOnlyMode());
+    document.body.classList.toggle('obs-death-only', isDeathOnlyMode());
+    document.body.classList.toggle('obs-cemetery-only', isCemeteryOnlyMode());
     
     if (!isOBSMode()) {
         document.querySelectorAll('[data-layout]').forEach(btn => {
@@ -564,12 +715,21 @@ function applyConfig() {
         if (el('showLevel')) el('showLevel').checked = config.showLevel;
         if (el('showHP')) el('showHP').checked = config.showHP;
         if (el('showShiny')) el('showShiny').checked = config.showShiny;
+        if (el('deathAnimation')) el('deathAnimation').checked = config.deathAnimation;
         if (el('showBadgesPreview')) el('showBadgesPreview').checked = config.showBadges;
+        if (el('showCemeteryPreview')) el('showCemeteryPreview').checked = config.showCemetery;
         if (el('badgeSize')) el('badgeSize').value = config.badgeSize;
         if (el('badgeSizeInput')) el('badgeSizeInput').value = config.badgeSize;
         if (el('badgeDimUnobtained')) el('badgeDimUnobtained').checked = config.badgeDimUnobtained;
         if (el('showBadgeLabels')) el('showBadgeLabels').checked = config.showBadgeLabels;
         toggleOptions('badgeOptions', true);
+        if (el('cemeterySpriteType')) el('cemeterySpriteType').value = config.cemeterySpriteType;
+        if (el('cemeterySpriteSize')) el('cemeterySpriteSize').value = config.cemeterySpriteSize;
+        if (el('cemeterySpriteSizeInput')) el('cemeterySpriteSizeInput').value = config.cemeterySpriteSize;
+        if (el('cemeteryGrayscale')) el('cemeteryGrayscale').checked = config.cemeteryGrayscale;
+        document.querySelectorAll('input[name="cemeteryColumns"]').forEach(r => {
+            r.checked = String(config.cemeteryColumns) === r.value;
+        });
         if (el('nameOffsetY')) el('nameOffsetY').value = config.nameOffsetY;
         if (el('nameOffsetYInput')) el('nameOffsetYInput').value = config.nameOffsetY;
         const isGridLayout = config.layout === 'grid-h' || config.layout === 'grid-v';
@@ -630,6 +790,7 @@ function applyConfig() {
     if (currentTeam) {
         if (shouldShowTeam()) renderTeam(currentTeam);
         renderBadges(currentTeam);
+        renderCemetery(currentTeam);
     }
 }
 
@@ -672,6 +833,22 @@ function setupConfigListeners() {
         });
     });
 
+    bindCheckbox('deathAnimation', 'deathAnimation');
+
+    const previewDeathAnimBtn = document.getElementById('previewDeathAnimBtn');
+    if (previewDeathAnimBtn) {
+        previewDeathAnimBtn.addEventListener('click', () => {
+            const fainted = (currentTeam?.team || []).filter(p => p.currentHP === 0);
+            const sample = fainted.length ? fainted : (currentTeam?.team || []).slice(0, 3);
+            if (!sample.length) {
+                previewDeathAnimBtn.textContent = 'Sin equipo cargado';
+                setTimeout(() => { previewDeathAnimBtn.textContent = 'Probar animación'; }, 1800);
+                return;
+            }
+            playDeathAnimation(sample, true);
+        });
+    }
+
     const showBadgesPreview = document.getElementById('showBadgesPreview');
     if (showBadgesPreview) {
         showBadgesPreview.addEventListener('change', e => {
@@ -684,6 +861,45 @@ function setupConfigListeners() {
     bindCheckbox('badgeDimUnobtained', 'badgeDimUnobtained');
     bindCheckbox('showBadgeLabels', 'showBadgeLabels');
     setupRangeInput('badgeSize', 'badgeSizeInput', 'badgeSize');
+
+    const showCemeteryPreview = document.getElementById('showCemeteryPreview');
+    if (showCemeteryPreview) {
+        showCemeteryPreview.addEventListener('change', e => {
+            config.showCemetery = e.target.checked;
+            saveConfig();
+            applyConfig();
+        });
+    }
+
+    const cemeterySpriteType = document.getElementById('cemeterySpriteType');
+    if (cemeterySpriteType) {
+        cemeterySpriteType.addEventListener('change', async e => {
+            config.cemeterySpriteType = e.target.value;
+            saveConfig();
+            applyConfig();
+            if (getSpriteTypeEntry(config.cemeterySpriteType).source === 'pmd' && currentTeam?.cemetery?.length) {
+                await withSpriteTypeAsync(config.cemeterySpriteType, async () => {
+                    await resolvePmdPortraits(currentTeam.cemetery);
+                });
+                renderCemetery(currentTeam);
+            }
+        });
+    }
+
+    document.querySelectorAll('input[name="cemeteryColumns"]').forEach(r => {
+        r.addEventListener('change', e => {
+            if (!e.target.checked) return;
+            const cols = parseInt(e.target.value, 10);
+            if ([5, 7, 9].includes(cols)) {
+                config.cemeteryColumns = cols;
+                saveConfig();
+                applyConfig();
+            }
+        });
+    });
+
+    setupRangeInput('cemeterySpriteSize', 'cemeterySpriteSizeInput', 'cemeterySpriteSize');
+    bindCheckbox('cemeteryGrayscale', 'cemeteryGrayscale');
 
     setupRangeInput('nameOffsetY', 'nameOffsetYInput', 'nameOffsetY');
     
@@ -812,6 +1028,28 @@ function setupConfigListeners() {
             });
         });
     }
+
+    const copyDeathUrlBtn = document.getElementById('copyDeathUrlBtn');
+    if (copyDeathUrlBtn) {
+        copyDeathUrlBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(document.getElementById('obsDeathUrl').value).then(() => {
+                copyDeathUrlBtn.textContent = '✓ Copiado';
+                copyDeathUrlBtn.classList.add('copied');
+                setTimeout(() => { copyDeathUrlBtn.textContent = '📋 Copiar'; copyDeathUrlBtn.classList.remove('copied'); }, 2000);
+            });
+        });
+    }
+
+    const copyCemeteryUrlBtn = document.getElementById('copyCemeteryUrlBtn');
+    if (copyCemeteryUrlBtn) {
+        copyCemeteryUrlBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(document.getElementById('obsCemeteryUrl').value).then(() => {
+                copyCemeteryUrlBtn.textContent = '✓ Copiado';
+                copyCemeteryUrlBtn.classList.add('copied');
+                setTimeout(() => { copyCemeteryUrlBtn.textContent = '📋 Copiar'; copyCemeteryUrlBtn.classList.remove('copied'); }, 2000);
+            });
+        });
+    }
 }
 
 function setupRangeInput(rangeId, inputId, configKey) {
@@ -891,26 +1129,35 @@ async function loadCustomSpritePacks() {
 }
 
 function refreshCustomSpriteOptions() {
-    const group = document.getElementById('customSpritesGroup');
+    const groups = [
+        document.getElementById('customSpritesGroup'),
+        document.getElementById('customSpritesGroupCemetery')
+    ].filter(Boolean);
     const select = document.getElementById('spriteType');
-    if (!group) return;
-
-    group.innerHTML = '';
+    const cemeterySelect = document.getElementById('cemeterySpriteType');
+    if (!groups.length) return;
 
     const packs = customSpritePacks.length
         ? customSpritePacks
         : [{ id: config.customSpritePack || 'geniv' }];
 
-    for (const pack of packs) {
-        const opt = document.createElement('option');
-        opt.value = `${CUSTOM_SPRITE_PREFIX}${pack.id}`;
-        opt.textContent = pack.id;
-        group.appendChild(opt);
+    for (const group of groups) {
+        group.innerHTML = '';
+        for (const pack of packs) {
+            const opt = document.createElement('option');
+            opt.value = `${CUSTOM_SPRITE_PREFIX}${pack.id}`;
+            opt.textContent = pack.id;
+            group.appendChild(opt);
+        }
     }
 
     if (config.spriteType === 'custom') {
         config.spriteType = `${CUSTOM_SPRITE_PREFIX}${getCustomSpritePack('custom')}`;
         config.customSpritePack = getCustomSpritePack(config.spriteType);
+        saveConfig();
+    }
+    if (config.cemeterySpriteType === 'custom') {
+        config.cemeterySpriteType = `${CUSTOM_SPRITE_PREFIX}${getCustomSpritePack('custom')}`;
         saveConfig();
     }
 
@@ -920,9 +1167,16 @@ function refreshCustomSpriteOptions() {
         config.customSpritePack = getCustomSpritePack(config.spriteType);
         saveConfig();
     }
+    if (isCustomSpriteType(config.cemeterySpriteType) && !values.includes(config.cemeterySpriteType)) {
+        config.cemeterySpriteType = values[0] || 'default';
+        saveConfig();
+    }
 
     if (select && [...select.options].some(o => o.value === config.spriteType)) {
         select.value = config.spriteType;
+    }
+    if (cemeterySelect && [...cemeterySelect.options].some(o => o.value === config.cemeterySpriteType)) {
+        cemeterySelect.value = config.cemeterySpriteType;
     }
 }
 
@@ -1311,6 +1565,85 @@ function renderTeam(data) {
     setupAllSpriteSheets();
 }
 
+function createCemeterySprite(pokemon) {
+    const spriteType = getSpriteTypeEntry(config.spriteType);
+    const isHighRes = !!spriteType.highRes;
+    const gray = !!config.cemeteryGrayscale;
+    let spriteClass = 'pokemon-sprite cemetery-sprite' + (isHighRes ? ' high-res' : '') + (gray ? ' fainted' : '');
+    const spriteFilter = gray ? 'grayscale(100%)' : 'none';
+
+    const primaryUrl = getSpriteUrl(pokemon);
+    const typeKey = isCustomSpriteType(config.spriteType) ? 'default' : config.spriteType;
+    const type = spriteType;
+    const shiny = !!pokemon.isShiny;
+    const form = pokemon.form || 0;
+    const isCustom = type.source === 'custom';
+
+    let fallbackUrl = FALLBACK_SPRITE;
+    if (isCustom) {
+        const customUrls = buildCustomSpriteUrls(pokemon);
+        fallbackUrl = customUrls[1] || buildSpriteUrl('default', pokemon.species, shiny, false);
+    } else if (type.source === 'pmd') {
+        if (pokemon.gender === 1) {
+            fallbackUrl = buildPmdPortraitUrl(pokemon.species, form, shiny, false, type.emotion || 'Normal');
+        } else if (shiny) {
+            fallbackUrl = buildPmdPortraitUrl(pokemon.species, form, false, false, type.emotion || 'Normal');
+        }
+    } else if (pokemon.gender === 1) {
+        fallbackUrl = buildSpriteUrl(typeKey, pokemon.species, shiny, false);
+    }
+
+    const fallback2 = isCustom
+        ? buildSpriteUrl('default', pokemon.species, shiny, false)
+        : ((type.source === 'pmd' && shiny)
+            ? buildPmdPortraitUrl(pokemon.species, form, false, false, type.emotion || 'Normal')
+            : FALLBACK_SPRITE);
+
+    const onErr = isCustom
+        ? buildChainedImgErrorHandler([...buildCustomSpriteUrls(pokemon).slice(1), fallback2, FALLBACK_SPRITE])
+        : buildImgErrorHandler(fallbackUrl, fallback2);
+
+    if (isCustom) {
+        return `<div class="cemetery-slot">${buildCustomSpriteImgHtml(
+            primaryUrl,
+            spriteClass,
+            spriteFilter,
+            onErr,
+            pokemon.speciesName
+        )}</div>`;
+    }
+
+    return `<div class="cemetery-slot">`
+        + `<img src="${primaryUrl}" alt="${escapeHtml(pokemon.speciesName)}" class="${spriteClass}" style="filter:${spriteFilter}" data-fb2="${fallback2}" onerror="${onErr}">`
+        + `</div>`;
+}
+
+function renderCemetery(data) {
+    const wrapper = document.getElementById('cemeteryWrapper');
+    const grid = document.getElementById('cemeteryGrid');
+    if (!wrapper || !grid) return;
+
+    if (!shouldShowCemetery()) {
+        wrapper.hidden = true;
+        grid.innerHTML = '';
+        return;
+    }
+
+    const list = data?.cemetery || [];
+    wrapper.hidden = false;
+    grid.className = 'cemetery-grid' + (config.cemeteryGrayscale ? ' bw' : '');
+
+    if (!list.length) {
+        grid.innerHTML = `<div class="empty-state">Cementerio vacío</div>`;
+        return;
+    }
+
+    withSpriteType(config.cemeterySpriteType, () => {
+        grid.innerHTML = list.map(p => createCemeterySprite(p)).join('');
+        setupAllSpriteSheets();
+    });
+}
+
 function buildBadgeUrl(spriteId) {
     return `${BADGE_BASE}/${spriteId}.png`;
 }
@@ -1365,9 +1698,136 @@ function renderBadges(data) {
 
 function teamsEqual(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
 
+function pokemonIdentityKey(p) {
+    return `${p.slot}|${p.species}|${p.form || 0}|${p.nickname || ''}`;
+}
+
+function findPreviousMatch(prevTeam, pokemon) {
+    if (!prevTeam?.length) return null;
+    const bySlot = prevTeam.find(x => x.slot === pokemon.slot && x.species === pokemon.species);
+    if (bySlot) return bySlot;
+    return prevTeam.find(x =>
+        x.species === pokemon.species &&
+        (x.nickname || '') === (pokemon.nickname || '') &&
+        (x.form || 0) === (pokemon.form || 0)
+    ) || null;
+}
+
+/** Pokémon que pasan a 0 HP respecto al equipo anterior (no anima en la primera carga). */
+function getNewlyFainted(prevData, nextData) {
+    if (!prevData?.team || !nextData?.team) return [];
+    const newly = [];
+    for (const p of nextData.team) {
+        if (p.currentHP !== 0) continue;
+        const prev = findPreviousMatch(prevData.team, p);
+        if (!prev || prev.currentHP > 0) newly.push(p);
+    }
+    return newly;
+}
+
+function getDeathDisplayName(pokemon) {
+    if (pokemon.hasNickname && pokemon.nickname) return pokemon.nickname;
+    return pokemon.speciesName || 'Pokémon';
+}
+
+function buildDeathCardHtml(pokemon) {
+    const displayName = getDeathDisplayName(pokemon);
+    const spriteType = getSpriteTypeEntry(config.spriteType);
+    const isHighRes = !!spriteType.highRes;
+    const primaryUrl = getSpriteUrl(pokemon);
+    const typeKey = isCustomSpriteType(config.spriteType) ? 'default' : config.spriteType;
+    const type = spriteType;
+    const shiny = !!pokemon.isShiny;
+    const form = pokemon.form || 0;
+    const isCustom = type.source === 'custom';
+
+    let fallbackUrl = FALLBACK_SPRITE;
+    if (isCustom) {
+        const customUrls = buildCustomSpriteUrls(pokemon);
+        fallbackUrl = customUrls[1] || buildSpriteUrl('default', pokemon.species, shiny, false);
+    } else if (type.source === 'pmd') {
+        if (pokemon.gender === 1) {
+            fallbackUrl = buildPmdPortraitUrl(pokemon.species, form, shiny, false, type.emotion || 'Normal');
+        } else if (shiny) {
+            fallbackUrl = buildPmdPortraitUrl(pokemon.species, form, false, false, type.emotion || 'Normal');
+        }
+    } else if (pokemon.gender === 1) {
+        fallbackUrl = buildSpriteUrl(typeKey, pokemon.species, shiny, false);
+    }
+
+    const fallback2 = isCustom
+        ? buildSpriteUrl('default', pokemon.species, shiny, false)
+        : ((type.source === 'pmd' && shiny)
+            ? buildPmdPortraitUrl(pokemon.species, form, false, false, type.emotion || 'Normal')
+            : FALLBACK_SPRITE);
+
+    const onErr = isCustom
+        ? buildChainedImgErrorHandler([...buildCustomSpriteUrls(pokemon).slice(1), fallback2, FALLBACK_SPRITE])
+        : buildImgErrorHandler(fallbackUrl, fallback2);
+
+    const grayFilter = 'grayscale(100%)';
+    let spriteHtml;
+    if (isCustom) {
+        spriteHtml = buildCustomSpriteImgHtml(primaryUrl, 'pokemon-sprite fainted', grayFilter, onErr, pokemon.speciesName);
+    } else {
+        const cls = 'pokemon-sprite fainted' + (isHighRes ? ' high-res' : '');
+        spriteHtml = `<img src="${primaryUrl}" alt="${escapeHtml(pokemon.speciesName)}" class="${cls}" style="filter:${grayFilter}" data-fb2="${fallback2}" onerror="${onErr}">`;
+    }
+
+    return `<div class="death-card" data-key="${escapeHtml(pokemonIdentityKey(pokemon))}">`
+        + spriteHtml
+        + `<span class="death-card-name">${escapeHtml(displayName)}</span>`
+        + `</div>`;
+}
+
+function hideDeathOverlay() {
+    const overlay = document.getElementById('deathOverlay');
+    if (!overlay || overlay.hidden) return;
+    overlay.classList.remove('visible');
+    overlay.classList.add('hiding');
+    clearTimeout(deathAnimHideTimer);
+    deathAnimHideTimer = setTimeout(() => {
+        overlay.hidden = true;
+        overlay.classList.remove('hiding');
+        const party = document.getElementById('deathParty');
+        if (party) party.innerHTML = '';
+    }, DEATH_ANIM_FADE_MS);
+}
+
+function playDeathAnimation(fallen, force = false) {
+    if (!fallen?.length) return;
+    if (!force && !shouldPlayDeathAnimation()) return;
+
+    const overlay = document.getElementById('deathOverlay');
+    const title = document.getElementById('deathTitle');
+    const party = document.getElementById('deathParty');
+    if (!overlay || !title || !party) return;
+
+    clearTimeout(deathAnimTimer);
+    clearTimeout(deathAnimHideTimer);
+
+    const n = fallen.length;
+    title.textContent = n === 1
+        ? 'HA CAÍDO 1 POKÉMON'
+        : `HAN CAÍDO ${n} POKÉMON`;
+
+    party.innerHTML = fallen.map(buildDeathCardHtml).join('');
+    overlay.hidden = false;
+    overlay.classList.remove('hiding');
+    // Force reflow so the fade-in transition runs even if replayed quickly
+    void overlay.offsetWidth;
+    overlay.classList.add('visible');
+
+    setupAllSpriteSheets();
+
+    deathAnimTimer = setTimeout(hideDeathOverlay, DEATH_ANIM_HOLD_MS);
+}
+
 async function updateOverlay() {
     const t = await fetchTeamData();
     if (teamsEqual(currentTeam, t)) return;
+
+    const newlyFainted = shouldPlayDeathAnimation() ? getNewlyFainted(currentTeam, t) : [];
 
     currentTeam = t;
     if (shouldShowTeam()) {
@@ -1378,6 +1838,15 @@ async function updateOverlay() {
         renderTeam(t);
     }
     renderBadges(t);
+
+    if (shouldShowCemetery() && getSpriteTypeEntry(config.cemeterySpriteType).source === 'pmd' && t?.cemetery?.length) {
+        await withSpriteTypeAsync(config.cemeterySpriteType, async () => {
+            await resolvePmdPortraits(t.cemetery);
+        });
+    }
+    renderCemetery(t);
+
+    if (newlyFainted.length) playDeathAnimation(newlyFainted);
 }
 
 async function init() {

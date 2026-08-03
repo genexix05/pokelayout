@@ -25,10 +25,11 @@
             <!-- ── Disposición ── -->
             <details class="config-section" open>
                 <summary class="config-section-title">
-                    <span class="config-section-label">Disposición</span>
+                    <span class="config-section-label">1 · Disposición</span>
                     <span class="config-section-chevron" aria-hidden="true"></span>
                 </summary>
                 <div class="config-section-body">
+                    <p class="config-section-hint">Cómo se coloca el equipo en pantalla.</p>
                     <div class="config-group">
                         <label>Layout del equipo</label>
                         <div class="layout-grid">
@@ -104,12 +105,13 @@
             <!-- ── Contenido ── -->
             <details class="config-section" open>
                 <summary class="config-section-title">
-                    <span class="config-section-label">Contenido visible</span>
+                    <span class="config-section-label">2 · Qué mostrar</span>
                     <span class="config-section-chevron" aria-hidden="true"></span>
                 </summary>
                 <div class="config-section-body">
+                    <p class="config-section-hint">Activa o desactiva elementos de cada Pokémon.</p>
                     <div class="config-group">
-                        <label>Mostrar en cada Pokémon</label>
+                        <label>En cada Pokémon</label>
                         <div class="config-chips">
                             <label class="config-chip">
                                 <input type="checkbox" id="showNickname" checked>
@@ -129,39 +131,11 @@
                             </label>
                         </div>
                     </div>
-
-                    <div class="config-group">
-                        <div class="slider-header">
-                            <label for="nameOffsetY">Desplazamiento del nombre</label>
-                            <div class="slider-value">
-                                <input type="number" id="nameOffsetYInput" value="0" min="-60" max="60" class="config-number">
-                                <span class="unit">px</span>
-                            </div>
-                        </div>
-                        <input type="range" id="nameOffsetY" min="-60" max="60" value="0">
-                        <span class="obs-hint">Negativo sube el texto; positivo lo baja</span>
-                    </div>
-
-                    <div class="config-group">
-                        <label>Posición del nivel</label>
-                        <div class="level-pos-grid" role="group" aria-label="Posición del nivel">
-                            <button type="button" class="level-pos-btn" data-level-pos="top-left" title="Arriba izquierda">↖</button>
-                            <span class="level-pos-gap" aria-hidden="true"></span>
-                            <button type="button" class="level-pos-btn" data-level-pos="top-right" title="Arriba derecha">↗</button>
-                            <span class="level-pos-gap" aria-hidden="true"></span>
-                            <button type="button" class="level-pos-btn level-pos-center active" data-level-pos="below" title="Debajo del sprite">Debajo</button>
-                            <span class="level-pos-gap" aria-hidden="true"></span>
-                            <button type="button" class="level-pos-btn" data-level-pos="bottom-left" title="Abajo izquierda">↙</button>
-                            <span class="level-pos-gap" aria-hidden="true"></span>
-                            <button type="button" class="level-pos-btn" data-level-pos="bottom-right" title="Abajo derecha">↘</button>
-                        </div>
-                        <span class="obs-hint">Elige una esquina del sprite o debajo del nombre</span>
-                    </div>
                 </div>
             </details>
 
             <!-- ── Medallas ── -->
-            <details class="config-section" open>
+            <details class="config-section">
                 <summary class="config-section-title">
                     <span class="config-section-label">Medallas</span>
                     <span class="config-section-chevron" aria-hidden="true"></span>
@@ -209,10 +183,11 @@
             <!-- ── Sprites ── -->
             <details class="config-section">
                 <summary class="config-section-title">
-                    <span class="config-section-label">Sprites</span>
+                    <span class="config-section-label">3 · Sprites</span>
                     <span class="config-section-chevron" aria-hidden="true"></span>
                 </summary>
                 <div class="config-section-body">
+                    <p class="config-section-hint">Estilo y efectos visuales de los Pokémon del equipo.</p>
                     <div class="config-group">
                         <label for="spriteType">Estilo de sprite</label>
                         <select id="spriteType" class="config-select">
@@ -339,12 +314,13 @@
             <!-- ── Texto ── -->
             <details class="config-section">
                 <summary class="config-section-title">
-                    <span class="config-section-label">Texto y tipografía</span>
+                    <span class="config-section-label">4 · Texto del overlay</span>
                     <span class="config-section-chevron" aria-hidden="true"></span>
                 </summary>
                 <div class="config-section-body">
+                    <p class="config-section-hint">Solo afecta a nombres y niveles del overlay. Este panel siempre usa Fredoka.</p>
                     <div class="config-group">
-                        <label for="fontFamily">Fuente</label>
+                        <label for="fontFamily">Fuente de los Pokémon</label>
                         <select id="fontFamily" class="config-select">
                             <optgroup id="customFontsGroup" label="── Tus fuentes ──" hidden></optgroup>
                             <optgroup label="── Modernas ──">
@@ -445,6 +421,34 @@
                         </div>
                     </div>
 
+                    <div class="config-group">
+                        <div class="slider-header">
+                            <label for="nameOffsetY">Desplazamiento del nombre</label>
+                            <div class="slider-value">
+                                <input type="number" id="nameOffsetYInput" value="0" min="-60" max="60" class="config-number">
+                                <span class="unit">px</span>
+                            </div>
+                        </div>
+                        <input type="range" id="nameOffsetY" min="-60" max="60" value="0">
+                        <span class="obs-hint">Negativo sube el texto; positivo lo baja</span>
+                    </div>
+
+                    <div class="config-group">
+                        <label>Posición del nivel</label>
+                        <div class="level-pos-grid" role="group" aria-label="Posición del nivel">
+                            <button type="button" class="level-pos-btn" data-level-pos="top-left" title="Arriba izquierda">↖</button>
+                            <span class="level-pos-gap" aria-hidden="true"></span>
+                            <button type="button" class="level-pos-btn" data-level-pos="top-right" title="Arriba derecha">↗</button>
+                            <span class="level-pos-gap" aria-hidden="true"></span>
+                            <button type="button" class="level-pos-btn level-pos-center active" data-level-pos="below" title="Debajo del sprite">Debajo</button>
+                            <span class="level-pos-gap" aria-hidden="true"></span>
+                            <button type="button" class="level-pos-btn" data-level-pos="bottom-left" title="Abajo izquierda">↙</button>
+                            <span class="level-pos-gap" aria-hidden="true"></span>
+                            <button type="button" class="level-pos-btn" data-level-pos="bottom-right" title="Abajo derecha">↘</button>
+                        </div>
+                        <span class="obs-hint">Elige una esquina del sprite o debajo del nombre</span>
+                    </div>
+
                     <div class="config-group effect-group">
                         <label class="effect-toggle">
                             <input type="checkbox" id="textStroke">
@@ -497,6 +501,146 @@
                 </div>
             </details>
 
+            <!-- ── Animación de muerte ── -->
+            <details class="config-section">
+                <summary class="config-section-title">
+                    <span class="config-section-label">Animación de muerte</span>
+                    <span class="config-section-chevron" aria-hidden="true"></span>
+                </summary>
+                <div class="config-section-body">
+                    <p class="config-section-hint">Memorial “Han caído…” en una Browser Source aparte.</p>
+                    <div class="config-group effect-group">
+                        <label class="effect-toggle">
+                            <input type="checkbox" id="deathAnimation">
+                            <span class="effect-toggle-ui"></span>
+                            <span class="effect-toggle-text">
+                                <strong>Activar animación</strong>
+                                <small>Aparece la URL de muerte en la sección OBS</small>
+                            </span>
+                        </label>
+                        <button type="button" class="config-btn" id="previewDeathAnimBtn" style="margin-top:10px;width:100%">
+                            Probar animación
+                        </button>
+                    </div>
+                </div>
+            </details>
+
+            <!-- ── Cementerio ── -->
+            <details class="config-section">
+                <summary class="config-section-title">
+                    <span class="config-section-label">Cementerio (última caja PC)</span>
+                    <span class="config-section-chevron" aria-hidden="true"></span>
+                </summary>
+                <div class="config-section-body">
+                    <div class="config-group">
+                        <label class="effect-toggle">
+                            <input type="checkbox" id="showCemeteryPreview">
+                            <span class="effect-toggle-ui"></span>
+                            <span class="effect-toggle-text">
+                                <strong>Vista previa aquí</strong>
+                                <small>En OBS usa la URL de cementerio (fuente aparte)</small>
+                            </span>
+                        </label>
+                    </div>
+                    <div class="config-group" id="cemeteryOptions">
+                        <label for="cemeterySpriteType">Estilo de sprite</label>
+                        <select id="cemeterySpriteType" class="config-select">
+                            <optgroup id="customSpritesGroupCemetery" label="── Custom (custom-sprites/) ──"></optgroup>
+                            <optgroup label="── Modernos ──">
+                                <option value="default" selected>Pixel (Gen 5)</option>
+                                <option value="back">Espalda</option>
+                                <option value="official">Official Artwork</option>
+                                <option value="home">Pokémon HOME</option>
+                                <option value="showdown">Showdown (Animado)</option>
+                                <option value="dream">Dream World</option>
+                            </optgroup>
+                            <optgroup label="── PMD Collab ──">
+                                <option value="pmd-portrait">Portrait Normal</option>
+                                <option value="pmd-portrait-happy">Portrait Happy</option>
+                            </optgroup>
+                            <optgroup label="── Gen I ──">
+                                <option value="gen1-rb">Rojo / Azul</option>
+                                <option value="gen1-rb-gray">Rojo / Azul (Gris)</option>
+                                <option value="gen1-yellow">Amarillo</option>
+                                <option value="gen1-yellow-gbc">Amarillo (GBC)</option>
+                            </optgroup>
+                            <optgroup label="── Gen II ──">
+                                <option value="gen2-crystal">Cristal</option>
+                                <option value="gen2-crystal-anim">Cristal (Animado)</option>
+                                <option value="gen2-gold">Oro</option>
+                                <option value="gen2-silver">Plata</option>
+                            </optgroup>
+                            <optgroup label="── Gen III ──">
+                                <option value="gen3-emerald">Esmeralda</option>
+                                <option value="gen3-frlg">Rojo Fuego / Verde Hoja</option>
+                                <option value="gen3-rs">Rubí / Zafiro</option>
+                            </optgroup>
+                            <optgroup label="── Gen IV ──">
+                                <option value="gen4-dp">Diamante / Perla</option>
+                                <option value="gen4-hgss">HeartGold / SoulSilver</option>
+                                <option value="gen4-platinum">Platino</option>
+                            </optgroup>
+                            <optgroup label="── Gen V ──">
+                                <option value="gen5-bw">Negro / Blanco</option>
+                                <option value="gen5-bw-anim">Negro / Blanco (Animado)</option>
+                                <option value="gen5-icons">Iconos Gen 5</option>
+                            </optgroup>
+                            <optgroup label="── Gen VI ──">
+                                <option value="gen6-oras">Omega Rubí / Alpha Zafiro</option>
+                                <option value="gen6-xy">X / Y</option>
+                            </optgroup>
+                            <optgroup label="── Gen VII ──">
+                                <option value="gen7-usum">Ultra Sol / Ultra Luna</option>
+                                <option value="gen7-icons">Iconos Gen 7</option>
+                            </optgroup>
+                            <optgroup label="── Gen VIII / IX ──">
+                                <option value="gen8-icons">Iconos Gen 8</option>
+                                <option value="gen8-bdsp">Diamante Brillante / Perla Reluciente</option>
+                                <option value="gen9-sv">Escarlata / Púrpura</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div class="config-group">
+                        <label>Pokémon por fila</label>
+                        <div class="config-chips" role="group" aria-label="Columnas del cementerio">
+                            <label class="config-chip">
+                                <input type="radio" name="cemeteryColumns" value="5" checked>
+                                <span>5</span>
+                            </label>
+                            <label class="config-chip">
+                                <input type="radio" name="cemeteryColumns" value="7">
+                                <span>7</span>
+                            </label>
+                            <label class="config-chip">
+                                <input type="radio" name="cemeteryColumns" value="9">
+                                <span>9</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="config-group">
+                        <div class="slider-header">
+                            <label for="cemeterySpriteSize">Tamaño del sprite</label>
+                            <div class="slider-value">
+                                <input type="number" id="cemeterySpriteSizeInput" value="40" min="16" class="config-number">
+                                <span class="unit">px</span>
+                            </div>
+                        </div>
+                        <input type="range" id="cemeterySpriteSize" min="16" max="200" value="40">
+                    </div>
+                    <div class="config-group effect-group">
+                        <label class="effect-toggle">
+                            <input type="checkbox" id="cemeteryGrayscale" checked>
+                            <span class="effect-toggle-ui"></span>
+                            <span class="effect-toggle-text">
+                                <strong>Blanco y negro</strong>
+                                <small>Desactívalo para sprites a color</small>
+                            </span>
+                        </label>
+                    </div>
+                    <span class="obs-hint">Usa la última caja del PC del save como cementerio (solo sprites)</span>
+                </div>
+            </details>
+
             <!-- ── OBS ── -->
             <details class="config-section" open>
                 <summary class="config-section-title">
@@ -504,6 +648,7 @@
                     <span class="config-section-chevron" aria-hidden="true"></span>
                 </summary>
                 <div class="config-section-body">
+                    <p class="config-section-hint">Copia estas URLs en Browser Sources de OBS. Se actualizan con tu configuración.</p>
                     <div class="config-group obs-url-group">
                         <label for="obsUrl">URL del equipo</label>
                         <div class="obs-url-container">
@@ -519,6 +664,31 @@
                             <button type="button" class="copy-url-btn" id="copyBadgesUrlBtn">📋 Copiar</button>
                         </div>
                         <span class="obs-hint">Segunda Browser Source solo para medallas — colócala donde quieras en OBS</span>
+                    </div>
+                    <div class="config-group obs-url-group">
+                        <label for="obsCemeteryUrl">URL de cementerio</label>
+                        <div class="obs-url-container">
+                            <input type="text" id="obsCemeteryUrl" readonly value="http://localhost:5051/?obs&view=cemetery">
+                            <button type="button" class="copy-url-btn" id="copyCemeteryUrlBtn">📋 Copiar</button>
+                        </div>
+                        <span class="obs-hint">Browser Source con los sprites de la última caja del PC</span>
+                    </div>
+                    <div class="config-group obs-url-group" id="obsDeathUrlGroup" hidden>
+                        <label for="obsDeathUrl">URL de animación de muerte</label>
+                        <div class="obs-url-container">
+                            <input type="text" id="obsDeathUrl" readonly value="http://localhost:5051/?obs&view=death">
+                            <button type="button" class="copy-url-btn" id="copyDeathUrlBtn">📋 Copiar</button>
+                        </div>
+                        <div class="obs-size-box">
+                            <div class="obs-size-title">Parámetros en OBS (Browser Source)</div>
+                            <ul class="obs-size-list">
+                                <li><strong>Ancho:</strong> 1920</li>
+                                <li><strong>Alto:</strong> 1080</li>
+                                <li>Misma resolución que tu lienzo (si usas 1280×720, pon eso)</li>
+                                <li>Posición: esquina superior izquierda (0, 0), a pantalla completa</li>
+                            </ul>
+                        </div>
+                        <span class="obs-hint">Fuente transparente encima del juego; solo aparece al caer un Pokémon</span>
                     </div>
                 </div>
             </details>
@@ -539,12 +709,25 @@
         <div class="badges-panel" id="badgesPanel" hidden></div>
     </div>
 
+    <!-- Contenedor del cementerio (última caja del PC) -->
+    <div class="cemetery-wrapper" id="cemeteryWrapper" hidden>
+        <div class="cemetery-grid" id="cemeteryGrid"></div>
+    </div>
+
     <!-- Contenedor del equipo -->
     <div class="team-wrapper" id="teamWrapper">
         <div class="team-container horizontal" id="team">
             <div class="loading-state">
                 <span>Esperando datos...</span>
             </div>
+        </div>
+    </div>
+
+    <!-- Overlay memorial de caídos (animación de muerte) -->
+    <div class="death-overlay" id="deathOverlay" hidden aria-live="polite">
+        <div class="death-overlay-inner">
+            <h1 class="death-title" id="deathTitle"></h1>
+            <div class="death-party" id="deathParty"></div>
         </div>
     </div>
 

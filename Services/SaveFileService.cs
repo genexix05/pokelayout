@@ -26,6 +26,9 @@ public class TeamData
     public string GameVersion { get; set; } = "";
     public string TrainerName { get; set; } = "";
     public List<PokemonData> Team { get; set; } = new();
+    /// <summary>Pokémon de la última caja del PC (cementerio nuzlocke).</summary>
+    public List<PokemonData> Cemetery { get; set; } = new();
+    public int CemeteryBoxIndex { get; set; } = -1;
     public List<BadgeSetData> BadgeSets { get; set; } = new();
     public DateTime LastUpdated { get; set; }
 }
@@ -66,7 +69,8 @@ public class SaveFileService
             _lastFilePath = filePath;
             _lastModified = File.GetLastWriteTime(filePath);
 
-            Console.WriteLine($"[SaveFileService] Equipo leído: {team.Team.Count} Pokémon de {team.TrainerName}");
+            Console.WriteLine($"[SaveFileService] Equipo leído: {team.Team.Count} Pokémon de {team.TrainerName}" +
+                (team.Cemetery.Count > 0 ? $", cementerio: {team.Cemetery.Count} (caja {team.CemeteryBoxIndex + 1})" : ""));
             return team;
         }
         catch (Exception ex)
@@ -144,29 +148,54 @@ public class SaveFileService
         {
             var pk = partyData[i];
             if (pk.Species == 0) continue;
-
-            team.Team.Add(new PokemonData
-            {
-                Slot = i + 1,
-                Species = pk.Species,
-                SpeciesName = GetSpeciesName(pk.Species),
-                SpeciesKey = NormalizeSpeciesKey(GetSpeciesName(pk.Species)),
-                Nickname = pk.Nickname,
-                HasNickname = pk.IsNicknamed,
-                Level = pk.CurrentLevel,
-                IsShiny = pk.IsShiny,
-                IsEgg = pk.IsEgg,
-                Form = pk.Form,
-                Gender = pk.Gender,
-                CurrentHP = pk.Stat_HPCurrent,
-                MaxHP = pk.Stat_HPMax,
-                HeldItem = GetItemName(pk.HeldItem),
-                SpriteUrl = GetSpriteUrl(pk.Species, pk.IsShiny)
-            });
+            team.Team.Add(BuildPokemonFromPkhex(pk, i + 1));
         }
 
+        FillCemeteryFromPkhex(sav, team);
         return team;
     }
+
+    private static void FillCemeteryFromPkhex(SaveFile sav, TeamData team)
+    {
+        try
+        {
+            if (!sav.HasBox || sav.BoxCount <= 0)
+                return;
+
+            var lastBox = sav.BoxCount - 1;
+            team.CemeteryBoxIndex = lastBox;
+            var box = sav.GetBoxData(lastBox);
+            for (int i = 0; i < box.Length; i++)
+            {
+                var pk = box[i];
+                if (pk.Species == 0) continue;
+                team.Cemetery.Add(BuildPokemonFromPkhex(pk, i + 1));
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SaveFileService] No se pudo leer cementerio (última caja): {ex.Message}");
+        }
+    }
+
+    private static PokemonData BuildPokemonFromPkhex(PKM pk, int slot) => new()
+    {
+        Slot = slot,
+        Species = pk.Species,
+        SpeciesName = GetSpeciesName(pk.Species),
+        SpeciesKey = NormalizeSpeciesKey(GetSpeciesName(pk.Species)),
+        Nickname = pk.Nickname,
+        HasNickname = pk.IsNicknamed,
+        Level = pk.CurrentLevel,
+        IsShiny = pk.IsShiny,
+        IsEgg = pk.IsEgg,
+        Form = pk.Form,
+        Gender = pk.Gender,
+        CurrentHP = pk.Stat_HPCurrent,
+        MaxHP = pk.Stat_HPMax,
+        HeldItem = GetItemName(pk.HeldItem),
+        SpriteUrl = GetSpriteUrl(pk.Species, pk.IsShiny)
+    };
 
     /// <summary>
     /// Intenta recortar dumps con bytes extra (algunos backups de Switch/emulador).
@@ -257,62 +286,160 @@ public class SaveFileService
         {
             for (int i = 0; i < party.Count && i < 6; i++)
             {
-                if (party[i] is not Dictionary<string, object?> pk)
-                    continue;
-
-                var speciesKey = GetString(pk, "species");
-                if (string.IsNullOrEmpty(speciesKey))
-                    continue;
-
-                var speciesId = EssentialsSpeciesMap.Resolve(speciesKey);
-                if (speciesId == 0)
-                {
-                    Console.WriteLine($"[SaveFileService] Especie Essentials desconocida: {speciesKey}");
-                }
-
-                var speciesName = EssentialsSpeciesMap.GetDisplayName(speciesId, speciesKey);
-                var nickname = GetString(pk, "name");
-                var hasNickname = !string.IsNullOrWhiteSpace(nickname) &&
-                                  !string.Equals(nickname, speciesName, StringComparison.OrdinalIgnoreCase) &&
-                                  !string.Equals(nickname, speciesKey, StringComparison.OrdinalIgnoreCase);
-
-                var isShiny = GetBool(pk, "shiny") || GetBool(pk, "super_shiny");
-                var form = GetInt(pk, "form");
-                var level = GetInt(pk, "level");
-                var hp = GetInt(pk, "hp");
-                var totalHp = GetInt(pk, "totalhp");
-                if (totalHp <= 0) totalHp = Math.Max(hp, 1);
-
-                var stepsToHatch = GetInt(pk, "steps_to_hatch");
-                var isEgg = stepsToHatch > 0;
-
-                var gender = GetInt(pk, "gender");
-                if (gender is < 0 or > 2) gender = 2;
-
-                var item = FormatEssentialsSymbol(GetRaw(pk, "item"));
-
-                team.Team.Add(new PokemonData
-                {
-                    Slot = i + 1,
-                    Species = speciesId,
-                    SpeciesName = speciesName,
-                    SpeciesKey = NormalizeSpeciesKey(speciesKey),
-                    Nickname = hasNickname ? nickname! : speciesName,
-                    HasNickname = hasNickname,
-                    Level = level,
-                    IsShiny = isShiny,
-                    IsEgg = isEgg,
-                    Form = form,
-                    Gender = gender,
-                    CurrentHP = hp,
-                    MaxHP = totalHp,
-                    HeldItem = item,
-                    SpriteUrl = GetSpriteUrl(speciesId, isShiny)
-                });
+                var poke = TryBuildEssentialsPokemon(party[i], i + 1);
+                if (poke != null)
+                    team.Team.Add(poke);
             }
         }
 
+        FillCemeteryFromEssentials(objects, player, team);
         return team;
+    }
+
+    private static void FillCemeteryFromEssentials(
+        List<object?> objects,
+        Dictionary<string, object?> player,
+        TeamData team)
+    {
+        try
+        {
+            var boxes = FindEssentialsBoxes(objects, player);
+            if (boxes == null || boxes.Count == 0)
+                return;
+
+            var lastIdx = boxes.Count - 1;
+            team.CemeteryBoxIndex = lastIdx;
+            var lastBox = boxes[lastIdx];
+            var slots = ExtractEssentialsBoxSlots(lastBox);
+            for (int i = 0; i < slots.Count; i++)
+            {
+                var poke = TryBuildEssentialsPokemon(slots[i], i + 1);
+                if (poke != null)
+                    team.Cemetery.Add(poke);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SaveFileService] Cementerio Essentials: {ex.Message}");
+        }
+    }
+
+    private static List<object?>? FindEssentialsBoxes(
+        List<object?> objects,
+        Dictionary<string, object?> player)
+    {
+        // v19+: storage en el hash raíz; pre-v19: objeto PokemonStorage suelto o en player
+        foreach (var obj in objects)
+        {
+            if (obj is Dictionary<string, object?> root)
+            {
+                var fromRoot = TryGetBoxesFromStorage(GetRaw(root, "storage")
+                    ?? GetRaw(root, "pokemon_storage")
+                    ?? GetRaw(root, "pc"));
+                if (fromRoot != null) return fromRoot;
+            }
+        }
+
+        var fromPlayer = TryGetBoxesFromStorage(GetRaw(player, "storage")
+            ?? GetRaw(player, "pokemon_storage")
+            ?? GetRaw(player, "pc"));
+        if (fromPlayer != null) return fromPlayer;
+
+        foreach (var obj in objects.OfType<Dictionary<string, object?>>())
+        {
+            if (obj.ContainsKey("boxes") || obj.ContainsKey("box"))
+            {
+                var boxes = TryGetBoxesFromStorage(obj);
+                if (boxes != null) return boxes;
+            }
+        }
+
+        return null;
+    }
+
+    private static List<object?>? TryGetBoxesFromStorage(object? storage)
+    {
+        if (storage is not Dictionary<string, object?> dict)
+            return null;
+
+        if (GetRaw(dict, "boxes") is List<object?> boxes && boxes.Count > 0)
+            return boxes;
+
+        if (GetRaw(dict, "box") is List<object?> box && box.Count > 0)
+            return box;
+
+        return null;
+    }
+
+    private static List<object?> ExtractEssentialsBoxSlots(object? box)
+    {
+        if (box is List<object?> list)
+            return list;
+
+        if (box is Dictionary<string, object?> dict)
+        {
+            foreach (var key in new[] { "pokemon", "pokemons", "contents", "data", "slots" })
+            {
+                if (GetRaw(dict, key) is List<object?> slots)
+                    return slots;
+            }
+        }
+
+        return [];
+    }
+
+    private static PokemonData? TryBuildEssentialsPokemon(object? raw, int slot)
+    {
+        if (raw is not Dictionary<string, object?> pk)
+            return null;
+
+        var speciesKey = GetString(pk, "species");
+        if (string.IsNullOrEmpty(speciesKey))
+            return null;
+
+        var speciesId = EssentialsSpeciesMap.Resolve(speciesKey);
+        if (speciesId == 0)
+            Console.WriteLine($"[SaveFileService] Especie Essentials desconocida: {speciesKey}");
+
+        var speciesName = EssentialsSpeciesMap.GetDisplayName(speciesId, speciesKey);
+        var nickname = GetString(pk, "name");
+        var hasNickname = !string.IsNullOrWhiteSpace(nickname) &&
+                          !string.Equals(nickname, speciesName, StringComparison.OrdinalIgnoreCase) &&
+                          !string.Equals(nickname, speciesKey, StringComparison.OrdinalIgnoreCase);
+
+        var isShiny = GetBool(pk, "shiny") || GetBool(pk, "super_shiny");
+        var form = GetInt(pk, "form");
+        var level = GetInt(pk, "level");
+        var hp = GetInt(pk, "hp");
+        var totalHp = GetInt(pk, "totalhp");
+        if (totalHp <= 0) totalHp = Math.Max(hp, 1);
+
+        var stepsToHatch = GetInt(pk, "steps_to_hatch");
+        var isEgg = stepsToHatch > 0;
+
+        var gender = GetInt(pk, "gender");
+        if (gender is < 0 or > 2) gender = 2;
+
+        var item = FormatEssentialsSymbol(GetRaw(pk, "item"));
+
+        return new PokemonData
+        {
+            Slot = slot,
+            Species = speciesId,
+            SpeciesName = speciesName,
+            SpeciesKey = NormalizeSpeciesKey(speciesKey),
+            Nickname = hasNickname ? nickname! : speciesName,
+            HasNickname = hasNickname,
+            Level = level,
+            IsShiny = isShiny,
+            IsEgg = isEgg,
+            Form = form,
+            Gender = gender,
+            CurrentHP = hp,
+            MaxHP = totalHp,
+            HeldItem = item,
+            SpriteUrl = GetSpriteUrl(speciesId, isShiny)
+        };
     }
 
     private static object? GetRaw(Dictionary<string, object?> obj, string key)
