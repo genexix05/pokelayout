@@ -21,6 +21,7 @@ let config = {
     showLevel: true,
     showHP: false,
     showShiny: true,
+    showHeldItem: false,
     deathAnimation: false,
     showBadges: false,
     badgeSize: 22,
@@ -31,8 +32,60 @@ let config = {
     cemeteryColumns: 5,
     cemeterySpriteSize: 40,
     cemeteryGrayscale: true,
+    showLives: false,
+    maxLives: 20,
+    livesDisplay: 'number',
+    livesShowMax: true,
+    livesFontFamily: 'Fredoka',
+    livesFontSize: 28,
+    livesColor: '#f8fafc',
+    livesMaxColor: '#94a3b8',
+    livesHeartSize: 22,
+    livesHeartGap: 4,
+    livesHeartColor: '#ef4444',
+    livesHeartLostColor: '#475569',
+    livesHeartStyle: 'classic',
+    livesHeartLayout: 'row',
+    livesHeartColumns: 5,
+    livesHeartStroke: false,
+    livesHeartStrokeColor: '#000000',
+    livesHeartStrokeWidth: 1.5,
+    livesHeartShadow: false,
+    livesHeartShadowColor: '#000000',
+    livesHeartShadowX: 1,
+    livesHeartShadowY: 1,
+    livesHeartShadowBlur: 2,
+    splitSlots: false,
     nameOffsetY: 0,
     levelPosition: 'below',
+    levelFontFamily: 'Inter',
+    levelFontSize: 10,
+    levelFormat: 'short',
+    levelOffsetX: 0,
+    levelOffsetY: 0,
+    levelBackground: false,
+    levelBackgroundColor: '#111827',
+    levelBorderRadius: 6,
+    levelPadding: 3,
+    heldItemPosition: 'bottom-right',
+    heldItemSize: 22,
+    heldItemOffsetX: 0,
+    heldItemOffsetY: 0,
+    heldItemBackground: false,
+    heldItemBackgroundColor: '#111827',
+    heldItemBorderRadius: 8,
+    heldItemPadding: 3,
+    hpDisplay: 'bar',
+    hpPosition: 'below',
+    hpBarWidth: 64,
+    hpBarHeight: 5,
+    hpFontSize: 10,
+    hpHighColor: '#22c55e',
+    hpMediumColor: '#eab308',
+    hpLowColor: '#ef4444',
+    hpBackgroundColor: '#1f2937',
+    hpTextColor: '#f8fafc',
+    hpBorderRadius: 3,
     spacing: 8,
     gridRowGap: 4,
     gridColGap: 4,
@@ -64,6 +117,7 @@ let config = {
 
 const SPRITE_BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon';
 const BADGE_BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges';
+const ITEM_SPRITE_BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items';
 const FALLBACK_SPRITE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png';
 
 // Tipos con soporte shiny / female / alta resolución
@@ -163,6 +217,19 @@ function isCemeteryOnlyMode() {
     return isOBSMode() && getObsView() === 'cemetery';
 }
 
+function isLivesOnlyMode() {
+    return isOBSMode() && getObsView() === 'lives';
+}
+
+function isSlotOnlyMode() {
+    return isOBSMode() && getObsView() === 'slot';
+}
+
+function getObsSlot() {
+    const n = parseInt(new URLSearchParams(window.location.search).get('slot'), 10);
+    return Number.isFinite(n) && n >= 1 && n <= 6 ? n : 1;
+}
+
 function shouldShowBadges() {
     if (isBadgesOnlyMode()) return true;
     if (isOBSMode()) return false;
@@ -175,15 +242,54 @@ function shouldShowCemetery() {
     return config.showCemetery;
 }
 
+function shouldShowLives() {
+    if (isLivesOnlyMode()) return true;
+    if (isOBSMode()) return false;
+    return config.showLives;
+}
+
 function shouldShowTeam() {
-    return !isBadgesOnlyMode() && !isDeathOnlyMode() && !isCemeteryOnlyMode();
+    return !isBadgesOnlyMode() && !isDeathOnlyMode() && !isCemeteryOnlyMode() && !isLivesOnlyMode();
 }
 
 function shouldPlayDeathAnimation() {
-    if (isBadgesOnlyMode() || isCemeteryOnlyMode()) return false;
+    if (isBadgesOnlyMode() || isCemeteryOnlyMode() || isLivesOnlyMode()) return false;
     // Fuente OBS dedicada, o vista previa en el panel de configuración
     if (isDeathOnlyMode()) return true;
     return !isOBSMode() && config.deathAnimation;
+}
+
+function countDeaths(data) {
+    const partyFainted = (data?.team || []).filter(p => p.currentHP === 0).length;
+    const cemetery = (data?.cemetery || []).length;
+    return partyFainted + cemetery;
+}
+
+function getLivesRemaining(data) {
+    const max = Math.max(0, Number(config.maxLives) || 0);
+    return Math.max(0, max - countDeaths(data));
+}
+
+function heldItemToSlug(name) {
+    return String(name || '')
+        .trim()
+        .replace(/^:/, '')
+        .toLowerCase()
+        .replace(/[''`]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
+function getHeldItemSpriteUrl(name) {
+    const slug = heldItemToSlug(name);
+    if (!slug) return '';
+    return `${ITEM_SPRITE_BASE}/${slug}.png`;
+}
+
+function formatHeldItemLabel(name) {
+    const raw = String(name || '').trim().replace(/^:/, '').replace(/_/g, ' ');
+    if (!raw) return '';
+    return raw.replace(/\b\w/g, c => c.toUpperCase());
 }
 
 function withSpriteType(typeKey, fn) {
@@ -235,8 +341,37 @@ function generateOBSUrl() {
     params.set('level', config.showLevel ? '1' : '0');
     params.set('namey', config.nameOffsetY);
     params.set('levelpos', config.levelPosition);
+    params.set('levelfont', config.levelFontFamily);
+    params.set('levelsize', config.levelFontSize);
+    params.set('levelfmt', config.levelFormat);
+    params.set('levelx', config.levelOffsetX);
+    params.set('levely', config.levelOffsetY);
+    params.set('levelbg', config.levelBackground ? '1' : '0');
+    params.set('levelbgc', config.levelBackgroundColor.replace('#', ''));
+    params.set('levelradius', config.levelBorderRadius);
+    params.set('levelpad', config.levelPadding);
     params.set('hp', config.showHP ? '1' : '0');
+    params.set('hpdisplay', config.hpDisplay);
+    params.set('hppos', config.hpPosition);
+    params.set('hpw', config.hpBarWidth);
+    params.set('hph', config.hpBarHeight);
+    params.set('hpfs', config.hpFontSize);
+    params.set('hphigh', config.hpHighColor.replace('#', ''));
+    params.set('hpmed', config.hpMediumColor.replace('#', ''));
+    params.set('hplow', config.hpLowColor.replace('#', ''));
+    params.set('hpbg', config.hpBackgroundColor.replace('#', ''));
+    params.set('hptxt', config.hpTextColor.replace('#', ''));
+    params.set('hpr', config.hpBorderRadius);
     params.set('shiny', config.showShiny ? '1' : '0');
+    params.set('item', config.showHeldItem ? '1' : '0');
+    params.set('itempos', config.heldItemPosition);
+    params.set('itemsize', config.heldItemSize);
+    params.set('itemx', config.heldItemOffsetX);
+    params.set('itemy', config.heldItemOffsetY);
+    params.set('itembg', config.heldItemBackground ? '1' : '0');
+    params.set('itembgc', config.heldItemBackgroundColor.replace('#', ''));
+    params.set('itemradius', config.heldItemBorderRadius);
+    params.set('itempad', config.heldItemPadding);
     params.set('stroke', config.textStroke ? '1' : '0');
     params.set('strokec', config.strokeColor.replace('#', ''));
     params.set('strokew', config.strokeWidth);
@@ -253,6 +388,42 @@ function generateOBSUrl() {
     params.set('sstroke', config.spriteStroke ? '1' : '0');
     params.set('sstrokec', config.spriteStrokeColor.replace('#', ''));
     params.set('sstrokew', config.spriteStrokeWidth);
+    return window.location.origin + '/?obs&' + params.toString();
+}
+
+function generateSlotOBSUrl(slot) {
+    const params = new URLSearchParams(new URL(generateOBSUrl()).search);
+    params.set('view', 'slot');
+    params.set('slot', String(slot));
+    return window.location.origin + '/?' + params.toString();
+}
+
+function generateLivesOBSUrl() {
+    const params = new URLSearchParams();
+    params.set('view', 'lives');
+    params.set('maxlives', config.maxLives);
+    params.set('bg', config.background);
+    params.set('ldisplay', config.livesDisplay === 'hearts' ? 'hearts' : 'number');
+    params.set('lshowmax', config.livesShowMax ? '1' : '0');
+    params.set('lfont', config.livesFontFamily);
+    params.set('lfontsize', config.livesFontSize);
+    params.set('lcolor', config.livesColor.replace('#', ''));
+    params.set('lmaxcolor', config.livesMaxColor.replace('#', ''));
+    params.set('lheartsize', config.livesHeartSize);
+    params.set('lheartgap', config.livesHeartGap);
+    params.set('lheartc', config.livesHeartColor.replace('#', ''));
+    params.set('lheartlost', config.livesHeartLostColor.replace('#', ''));
+    params.set('lheartstyle', config.livesHeartStyle || 'classic');
+    params.set('lheartlayout', config.livesHeartLayout || 'row');
+    params.set('lheartcols', config.livesHeartColumns || 5);
+    params.set('lheartstroke', config.livesHeartStroke ? '1' : '0');
+    params.set('lheartstrokec', (config.livesHeartStrokeColor || '#000000').replace('#', ''));
+    params.set('lheartstrokew', config.livesHeartStrokeWidth);
+    params.set('lheartshadow', config.livesHeartShadow ? '1' : '0');
+    params.set('lheartsc', (config.livesHeartShadowColor || '#000000').replace('#', ''));
+    params.set('lheartsx', config.livesHeartShadowX);
+    params.set('lheartsy', config.livesHeartShadowY);
+    params.set('lheartsb', config.livesHeartShadowBlur);
     return window.location.origin + '/?obs&' + params.toString();
 }
 
@@ -312,11 +483,27 @@ function updateOBSUrlField() {
     const deathUrl = document.getElementById('obsDeathUrl');
     const deathGroup = document.getElementById('obsDeathUrlGroup');
     const cemeteryUrl = document.getElementById('obsCemeteryUrl');
+    const livesUrl = document.getElementById('obsLivesUrl');
+    const slotGroup = document.getElementById('obsSlotUrlsGroup');
+    const slotUrls = document.getElementById('obsSlotUrls');
     if (teamUrl) teamUrl.value = generateOBSUrl();
     if (badgesUrl) badgesUrl.value = generateBadgesOBSUrl();
     if (deathUrl) deathUrl.value = generateDeathOBSUrl();
     if (deathGroup) deathGroup.hidden = !config.deathAnimation;
     if (cemeteryUrl) cemeteryUrl.value = generateCemeteryOBSUrl();
+    if (livesUrl) livesUrl.value = generateLivesOBSUrl();
+    if (slotGroup) slotGroup.hidden = !config.splitSlots;
+    if (slotUrls && config.splitSlots) {
+        slotUrls.innerHTML = [1, 2, 3, 4, 5, 6].map(slot => {
+            const url = generateSlotOBSUrl(slot);
+            return `<div class="obs-slot-row">`
+                + `<label for="obsSlotUrl${slot}">Slot ${slot}</label>`
+                + `<div class="obs-url-container">`
+                + `<input type="text" id="obsSlotUrl${slot}" readonly value="${escapeHtml(url)}">`
+                + `<button type="button" class="copy-url-btn" data-copy-slot="${slot}">📋 Copiar</button>`
+                + `</div></div>`;
+        }).join('');
+    }
 }
 
 function loadConfigFromURL() {
@@ -324,6 +511,7 @@ function loadConfigFromURL() {
     if (p.get('view') === 'badges') config.showBadges = true;
     if (p.get('view') === 'death') config.deathAnimation = true;
     if (p.get('view') === 'cemetery') config.showCemetery = true;
+    if (p.get('view') === 'lives') config.showLives = true;
     if (p.has('layout')) config.layout = p.get('layout');
     if (p.has('sprite')) {
         const sprite = p.get('sprite');
@@ -369,11 +557,96 @@ function loadConfigFromURL() {
     if (p.has('namey')) config.nameOffsetY = parseInt(p.get('namey'), 10) || 0;
     if (p.has('levelpos')) {
         const pos = p.get('levelpos');
-        const allowed = ['below', 'top-left', 'top-right', 'bottom-left', 'bottom-right'];
+        const allowed = ['below', 'top-left', 'top-right', 'left', 'right', 'bottom-left', 'bottom-right'];
         if (allowed.includes(pos)) config.levelPosition = pos;
     }
+    if (p.has('levelfont')) config.levelFontFamily = p.get('levelfont');
+    if (p.has('levelsize')) config.levelFontSize = parseInt(p.get('levelsize'), 10) || 10;
+    if (p.has('levelfmt') && ['short', 'long', 'number'].includes(p.get('levelfmt'))) config.levelFormat = p.get('levelfmt');
+    if (p.has('levelx')) config.levelOffsetX = parseInt(p.get('levelx'), 10) || 0;
+    if (p.has('levely')) config.levelOffsetY = parseInt(p.get('levely'), 10) || 0;
+    if (p.has('levelbg')) config.levelBackground = p.get('levelbg') === '1';
+    if (p.has('levelbgc')) config.levelBackgroundColor = '#' + p.get('levelbgc');
+    if (p.has('levelradius')) config.levelBorderRadius = parseInt(p.get('levelradius'), 10) || 0;
+    if (p.has('levelpad')) config.levelPadding = parseInt(p.get('levelpad'), 10) || 0;
     if (p.has('hp')) config.showHP = p.get('hp') === '1';
+    if (p.has('hpdisplay') && ['bar', 'current', 'fraction', 'bar-current', 'bar-fraction'].includes(p.get('hpdisplay'))) config.hpDisplay = p.get('hpdisplay');
+    if (p.has('hppos') && ['above', 'below'].includes(p.get('hppos'))) config.hpPosition = p.get('hppos');
+    if (p.has('hpw')) config.hpBarWidth = parseInt(p.get('hpw'), 10) || 64;
+    if (p.has('hph')) config.hpBarHeight = parseInt(p.get('hph'), 10) || 5;
+    if (p.has('hpfs')) config.hpFontSize = parseInt(p.get('hpfs'), 10) || 10;
+    if (p.has('hphigh')) config.hpHighColor = '#' + p.get('hphigh');
+    if (p.has('hpmed')) config.hpMediumColor = '#' + p.get('hpmed');
+    if (p.has('hplow')) config.hpLowColor = '#' + p.get('hplow');
+    if (p.has('hpbg')) config.hpBackgroundColor = '#' + p.get('hpbg');
+    if (p.has('hptxt')) config.hpTextColor = '#' + p.get('hptxt');
+    if (p.has('hpr')) config.hpBorderRadius = parseInt(p.get('hpr'), 10) || 0;
     if (p.has('shiny')) config.showShiny = p.get('shiny') === '1';
+    if (p.has('item')) config.showHeldItem = p.get('item') === '1';
+    if (p.has('itempos')) {
+        const pos = p.get('itempos');
+        if (['top-left', 'top-right', 'left', 'right', 'bottom-left', 'bottom-right'].includes(pos)) config.heldItemPosition = pos;
+    }
+    if (p.has('itemsize')) config.heldItemSize = parseInt(p.get('itemsize'), 10) || 22;
+    if (p.has('itemx')) config.heldItemOffsetX = parseInt(p.get('itemx'), 10) || 0;
+    if (p.has('itemy')) config.heldItemOffsetY = parseInt(p.get('itemy'), 10) || 0;
+    if (p.has('itembg')) config.heldItemBackground = p.get('itembg') === '1';
+    if (p.has('itembgc')) config.heldItemBackgroundColor = '#' + p.get('itembgc');
+    if (p.has('itemradius')) config.heldItemBorderRadius = parseInt(p.get('itemradius'), 10) || 0;
+    if (p.has('itempad')) config.heldItemPadding = parseInt(p.get('itempad'), 10) || 0;
+    if (p.has('maxlives')) {
+        const max = parseInt(p.get('maxlives'), 10);
+        if (Number.isFinite(max) && max > 0) config.maxLives = max;
+    }
+    if (p.has('ldisplay')) {
+        const d = p.get('ldisplay');
+        if (d === 'hearts' || d === 'number') config.livesDisplay = d;
+    }
+    if (p.has('lshowmax')) config.livesShowMax = p.get('lshowmax') === '1';
+    if (p.has('lfont')) config.livesFontFamily = p.get('lfont');
+    if (p.has('lfontsize')) {
+        const n = parseInt(p.get('lfontsize'), 10);
+        if (Number.isFinite(n) && n > 0) config.livesFontSize = n;
+    }
+    if (p.has('lcolor')) config.livesColor = '#' + p.get('lcolor');
+    if (p.has('lmaxcolor')) config.livesMaxColor = '#' + p.get('lmaxcolor');
+    if (p.has('lheartsize')) {
+        const n = parseInt(p.get('lheartsize'), 10);
+        if (Number.isFinite(n) && n > 0) config.livesHeartSize = n;
+    }
+    if (p.has('lheartgap')) {
+        const n = parseInt(p.get('lheartgap'), 10);
+        if (Number.isFinite(n) && n >= 0) config.livesHeartGap = n;
+    }
+    if (p.has('lheartc')) config.livesHeartColor = '#' + p.get('lheartc');
+    if (p.has('lheartlost')) config.livesHeartLostColor = '#' + p.get('lheartlost');
+    if (p.has('lheartstyle')) {
+        const style = p.get('lheartstyle');
+        const allowed = ['classic', 'soft', 'slim', 'wide', 'pixel', 'bubble', 'outline'];
+        if (allowed.includes(style)) config.livesHeartStyle = style;
+    }
+    if (p.has('lheartlayout')) {
+        const layout = p.get('lheartlayout');
+        if (['row', 'column', 'grid'].includes(layout)) config.livesHeartLayout = layout;
+    }
+    if (p.has('lheartcols')) {
+        const cols = parseInt(p.get('lheartcols'), 10);
+        if ([5, 7, 10].includes(cols)) config.livesHeartColumns = cols;
+    }
+    if (p.has('lheartstroke')) config.livesHeartStroke = p.get('lheartstroke') === '1';
+    if (p.has('lheartstrokec')) config.livesHeartStrokeColor = '#' + p.get('lheartstrokec');
+    if (p.has('lheartstrokew')) {
+        const n = parseFloat(p.get('lheartstrokew'));
+        if (Number.isFinite(n) && n > 0) config.livesHeartStrokeWidth = n;
+    }
+    if (p.has('lheartshadow')) config.livesHeartShadow = p.get('lheartshadow') === '1';
+    if (p.has('lheartsc')) config.livesHeartShadowColor = '#' + p.get('lheartsc');
+    if (p.has('lheartsx')) config.livesHeartShadowX = parseInt(p.get('lheartsx'), 10) || 0;
+    if (p.has('lheartsy')) config.livesHeartShadowY = parseInt(p.get('lheartsy'), 10) || 0;
+    if (p.has('lheartsb')) {
+        const n = parseInt(p.get('lheartsb'), 10);
+        if (Number.isFinite(n) && n >= 0) config.livesHeartShadowBlur = n;
+    }
     if (p.has('badgesize')) config.badgeSize = parseInt(p.get('badgesize')) || 22;
     if (p.has('badgedim')) config.badgeDimUnobtained = p.get('badgedim') === '1';
     if (p.has('badgelabels')) config.showBadgeLabels = p.get('badgelabels') === '1';
@@ -418,6 +691,36 @@ function loadConfig() {
             if (![5, 7, 9].includes(config.cemeteryColumns)) config.cemeteryColumns = 5;
             if (!config.cemeterySpriteSize) config.cemeterySpriteSize = 40;
             if (typeof config.cemeteryGrayscale !== 'boolean') config.cemeteryGrayscale = true;
+            if (typeof config.showHeldItem !== 'boolean') config.showHeldItem = false;
+            if (!['short', 'long', 'number'].includes(config.levelFormat)) config.levelFormat = 'short';
+            if (!['top-left', 'top-right', 'left', 'right', 'bottom-left', 'bottom-right'].includes(config.heldItemPosition)) config.heldItemPosition = 'bottom-right';
+            if (!['bar', 'current', 'fraction', 'bar-current', 'bar-fraction'].includes(config.hpDisplay)) config.hpDisplay = 'bar';
+            if (!['above', 'below'].includes(config.hpPosition)) config.hpPosition = 'below';
+            if (typeof config.showLives !== 'boolean') config.showLives = false;
+            if (typeof config.splitSlots !== 'boolean') config.splitSlots = false;
+            if (!Number.isFinite(config.maxLives) || config.maxLives < 1) config.maxLives = 20;
+            if (config.livesDisplay !== 'hearts' && config.livesDisplay !== 'number') config.livesDisplay = 'number';
+            if (typeof config.livesShowMax !== 'boolean') config.livesShowMax = true;
+            if (!config.livesFontFamily) config.livesFontFamily = 'Fredoka';
+            if (!Number.isFinite(config.livesFontSize) || config.livesFontSize < 1) config.livesFontSize = 28;
+            if (!config.livesColor) config.livesColor = '#f8fafc';
+            if (!config.livesMaxColor) config.livesMaxColor = '#94a3b8';
+            if (!Number.isFinite(config.livesHeartSize) || config.livesHeartSize < 1) config.livesHeartSize = 22;
+            if (!Number.isFinite(config.livesHeartGap) || config.livesHeartGap < 0) config.livesHeartGap = 4;
+            if (!config.livesHeartColor) config.livesHeartColor = '#ef4444';
+            if (!config.livesHeartLostColor) config.livesHeartLostColor = '#475569';
+            const heartStyles = ['classic', 'soft', 'slim', 'wide', 'pixel', 'bubble', 'outline'];
+            if (!heartStyles.includes(config.livesHeartStyle)) config.livesHeartStyle = 'classic';
+            if (!['row', 'column', 'grid'].includes(config.livesHeartLayout)) config.livesHeartLayout = 'row';
+            if (![5, 7, 10].includes(config.livesHeartColumns)) config.livesHeartColumns = 5;
+            if (typeof config.livesHeartStroke !== 'boolean') config.livesHeartStroke = false;
+            if (!config.livesHeartStrokeColor) config.livesHeartStrokeColor = '#000000';
+            if (!Number.isFinite(config.livesHeartStrokeWidth) || config.livesHeartStrokeWidth <= 0) config.livesHeartStrokeWidth = 1.5;
+            if (typeof config.livesHeartShadow !== 'boolean') config.livesHeartShadow = false;
+            if (!config.livesHeartShadowColor) config.livesHeartShadowColor = '#000000';
+            if (!Number.isFinite(config.livesHeartShadowX)) config.livesHeartShadowX = 1;
+            if (!Number.isFinite(config.livesHeartShadowY)) config.livesHeartShadowY = 1;
+            if (!Number.isFinite(config.livesHeartShadowBlur) || config.livesHeartShadowBlur < 0) config.livesHeartShadowBlur = 2;
         } catch (e) {}
     }
 }
@@ -650,6 +953,7 @@ function applyConfig() {
     const teamWrapper = document.getElementById('teamWrapper');
     const badgesWrapper = document.getElementById('badgesWrapper');
     const cemeteryWrapper = document.getElementById('cemeteryWrapper');
+    const livesWrapper = document.getElementById('livesWrapper');
     const fxPad = getSpriteFxPadding();
     
     root.style.setProperty('--spacing', config.spacing + 'px');
@@ -666,10 +970,44 @@ function applyConfig() {
     root.style.setProperty('--color-name', config.colorName);
     root.style.setProperty('--color-nickname', config.colorNickname);
     root.style.setProperty('--color-level', config.colorLevel);
+    root.style.setProperty('--level-font-family', `'${config.levelFontFamily}', sans-serif`);
+    root.style.setProperty('--level-font-size', (config.levelFontSize || 10) + 'px');
+    root.style.setProperty('--level-offset-x', (config.levelOffsetX || 0) + 'px');
+    root.style.setProperty('--level-offset-y', (config.levelOffsetY || 0) + 'px');
+    root.style.setProperty('--level-background', config.levelBackgroundColor || '#111827');
+    root.style.setProperty('--level-radius', (config.levelBorderRadius || 0) + 'px');
+    root.style.setProperty('--level-padding', (config.levelPadding || 0) + 'px');
     root.style.setProperty('--name-offset-y', (config.nameOffsetY || 0) + 'px');
+    root.style.setProperty('--held-item-size', (config.heldItemSize || 22) + 'px');
+    root.style.setProperty('--held-item-offset-x', (config.heldItemOffsetX || 0) + 'px');
+    root.style.setProperty('--held-item-offset-y', (config.heldItemOffsetY || 0) + 'px');
+    root.style.setProperty('--held-item-background', config.heldItemBackgroundColor || '#111827');
+    root.style.setProperty('--held-item-radius', (config.heldItemBorderRadius || 0) + 'px');
+    root.style.setProperty('--held-item-padding', (config.heldItemPadding || 0) + 'px');
+    root.style.setProperty('--hp-width', (config.hpBarWidth || 64) + 'px');
+    root.style.setProperty('--hp-height', (config.hpBarHeight || 5) + 'px');
+    root.style.setProperty('--hp-font-size', (config.hpFontSize || 10) + 'px');
+    root.style.setProperty('--hp-high-color', config.hpHighColor || '#22c55e');
+    root.style.setProperty('--hp-medium-color', config.hpMediumColor || '#eab308');
+    root.style.setProperty('--hp-low-color', config.hpLowColor || '#ef4444');
+    root.style.setProperty('--hp-background-color', config.hpBackgroundColor || '#1f2937');
+    root.style.setProperty('--hp-text-color', config.hpTextColor || '#f8fafc');
+    root.style.setProperty('--hp-radius', (config.hpBorderRadius || 0) + 'px');
     root.style.setProperty('--stroke-color', config.strokeColor);
     root.style.setProperty('--stroke-width', config.strokeWidth + 'px');
     root.style.setProperty('--text-fx-shadow', buildTextFxShadow());
+    root.style.setProperty('--lives-font-family', `'${config.livesFontFamily}', sans-serif`);
+    root.style.setProperty('--lives-font-size', (config.livesFontSize || 28) + 'px');
+    root.style.setProperty('--lives-color', config.livesColor || '#f8fafc');
+    root.style.setProperty('--lives-max-color', config.livesMaxColor || '#94a3b8');
+    root.style.setProperty('--lives-heart-size', (config.livesHeartSize || 22) + 'px');
+    root.style.setProperty('--lives-heart-gap', (config.livesHeartGap || 0) + 'px');
+    root.style.setProperty('--lives-heart-color', config.livesHeartColor || '#ef4444');
+    root.style.setProperty('--lives-heart-lost-color', config.livesHeartLostColor || '#475569');
+    root.style.setProperty('--lives-heart-cols', String(config.livesHeartColumns || 5));
+    root.style.setProperty('--lives-heart-stroke-color', config.livesHeartStrokeColor || '#000000');
+    root.style.setProperty('--lives-heart-stroke-width', (config.livesHeartStrokeWidth || 1.5) + 'px');
+    root.style.setProperty('--lives-heart-shadow', buildLivesHeartShadow());
     updateSpriteSvgFilter();
     
     if (isCustomSpriteType(config.spriteType) && currentTeam?.team?.length) {
@@ -693,10 +1031,17 @@ function applyConfig() {
         if (config.background !== 'transparent') cemeteryWrapper.classList.add('bg-' + config.background);
         if (isCemeteryOnlyMode()) cemeteryWrapper.hidden = false;
     }
+    if (livesWrapper) {
+        livesWrapper.className = 'lives-wrapper';
+        if (config.background !== 'transparent') livesWrapper.classList.add('bg-' + config.background);
+        if (isLivesOnlyMode()) livesWrapper.hidden = false;
+    }
     
     document.body.classList.toggle('obs-badges-only', isBadgesOnlyMode());
     document.body.classList.toggle('obs-death-only', isDeathOnlyMode());
     document.body.classList.toggle('obs-cemetery-only', isCemeteryOnlyMode());
+    document.body.classList.toggle('obs-lives-only', isLivesOnlyMode());
+    document.body.classList.toggle('obs-slot-only', isSlotOnlyMode());
     
     if (!isOBSMode()) {
         document.querySelectorAll('[data-layout]').forEach(btn => {
@@ -715,9 +1060,51 @@ function applyConfig() {
         if (el('showLevel')) el('showLevel').checked = config.showLevel;
         if (el('showHP')) el('showHP').checked = config.showHP;
         if (el('showShiny')) el('showShiny').checked = config.showShiny;
+        if (el('showHeldItem')) el('showHeldItem').checked = config.showHeldItem;
         if (el('deathAnimation')) el('deathAnimation').checked = config.deathAnimation;
         if (el('showBadgesPreview')) el('showBadgesPreview').checked = config.showBadges;
         if (el('showCemeteryPreview')) el('showCemeteryPreview').checked = config.showCemetery;
+        if (el('showLivesPreview')) el('showLivesPreview').checked = config.showLives;
+        if (el('splitSlots')) el('splitSlots').checked = config.splitSlots;
+        if (el('maxLives')) el('maxLives').value = config.maxLives;
+        if (el('maxLivesInput')) el('maxLivesInput').value = config.maxLives;
+        document.querySelectorAll('input[name="livesDisplay"]').forEach(r => {
+            r.checked = r.value === config.livesDisplay;
+        });
+        if (el('livesShowMax')) el('livesShowMax').checked = config.livesShowMax;
+        if (el('livesFontFamily')) el('livesFontFamily').value = config.livesFontFamily;
+        if (el('livesFontSize')) el('livesFontSize').value = config.livesFontSize;
+        if (el('livesFontSizeInput')) el('livesFontSizeInput').value = config.livesFontSize;
+        if (el('livesColor')) el('livesColor').value = config.livesColor;
+        if (el('livesMaxColor')) el('livesMaxColor').value = config.livesMaxColor;
+        if (el('livesHeartSize')) el('livesHeartSize').value = config.livesHeartSize;
+        if (el('livesHeartSizeInput')) el('livesHeartSizeInput').value = config.livesHeartSize;
+        if (el('livesHeartGap')) el('livesHeartGap').value = config.livesHeartGap;
+        if (el('livesHeartGapInput')) el('livesHeartGapInput').value = config.livesHeartGap;
+        if (el('livesHeartColor')) el('livesHeartColor').value = config.livesHeartColor;
+        if (el('livesHeartLostColor')) el('livesHeartLostColor').value = config.livesHeartLostColor;
+        if (el('livesHeartStyle')) el('livesHeartStyle').value = config.livesHeartStyle;
+        document.querySelectorAll('input[name="livesHeartLayout"]').forEach(r => {
+            r.checked = r.value === config.livesHeartLayout;
+        });
+        document.querySelectorAll('input[name="livesHeartColumns"]').forEach(r => {
+            r.checked = String(config.livesHeartColumns) === r.value;
+        });
+        if (el('livesHeartStroke')) el('livesHeartStroke').checked = config.livesHeartStroke;
+        if (el('livesHeartStrokeColor')) el('livesHeartStrokeColor').value = config.livesHeartStrokeColor;
+        if (el('livesHeartStrokeWidth')) el('livesHeartStrokeWidth').value = config.livesHeartStrokeWidth;
+        if (el('livesHeartStrokeWidthInput')) el('livesHeartStrokeWidthInput').value = config.livesHeartStrokeWidth;
+        if (el('livesHeartShadow')) el('livesHeartShadow').checked = config.livesHeartShadow;
+        if (el('livesHeartShadowColor')) el('livesHeartShadowColor').value = config.livesHeartShadowColor;
+        if (el('livesHeartShadowX')) el('livesHeartShadowX').value = config.livesHeartShadowX;
+        if (el('livesHeartShadowXInput')) el('livesHeartShadowXInput').value = config.livesHeartShadowX;
+        if (el('livesHeartShadowY')) el('livesHeartShadowY').value = config.livesHeartShadowY;
+        if (el('livesHeartShadowYInput')) el('livesHeartShadowYInput').value = config.livesHeartShadowY;
+        if (el('livesHeartShadowBlur')) el('livesHeartShadowBlur').value = config.livesHeartShadowBlur;
+        if (el('livesHeartShadowBlurInput')) el('livesHeartShadowBlurInput').value = config.livesHeartShadowBlur;
+        toggleOptions('livesHeartStrokeOptions', config.livesHeartStroke || config.livesHeartStyle === 'outline');
+        toggleOptions('livesHeartShadowOptions', config.livesHeartShadow);
+        updateLivesOptionsVisibility();
         if (el('badgeSize')) el('badgeSize').value = config.badgeSize;
         if (el('badgeSizeInput')) el('badgeSizeInput').value = config.badgeSize;
         if (el('badgeDimUnobtained')) el('badgeDimUnobtained').checked = config.badgeDimUnobtained;
@@ -754,6 +1141,42 @@ function applyConfig() {
         if (el('colorName')) el('colorName').value = config.colorName;
         if (el('colorNickname')) el('colorNickname').value = config.colorNickname;
         if (el('colorLevel')) el('colorLevel').value = config.colorLevel;
+        if (el('levelFontFamily')) el('levelFontFamily').value = config.levelFontFamily;
+        if (el('levelFontSize')) el('levelFontSize').value = config.levelFontSize;
+        if (el('levelFontSizeInput')) el('levelFontSizeInput').value = config.levelFontSize;
+        if (el('levelFormat')) el('levelFormat').value = config.levelFormat;
+        if (el('levelOffsetX')) el('levelOffsetX').value = config.levelOffsetX;
+        if (el('levelOffsetXInput')) el('levelOffsetXInput').value = config.levelOffsetX;
+        if (el('levelOffsetY')) el('levelOffsetY').value = config.levelOffsetY;
+        if (el('levelOffsetYInput')) el('levelOffsetYInput').value = config.levelOffsetY;
+        if (el('levelBackground')) el('levelBackground').checked = config.levelBackground;
+        if (el('levelBackgroundColor')) el('levelBackgroundColor').value = config.levelBackgroundColor;
+        if (el('levelBorderRadius')) el('levelBorderRadius').value = config.levelBorderRadius;
+        if (el('levelBorderRadiusInput')) el('levelBorderRadiusInput').value = config.levelBorderRadius;
+        if (el('levelPadding')) el('levelPadding').value = config.levelPadding;
+        if (el('levelPaddingInput')) el('levelPaddingInput').value = config.levelPadding;
+        if (el('heldItemPosition')) el('heldItemPosition').value = config.heldItemPosition;
+        if (el('heldItemSize')) el('heldItemSize').value = config.heldItemSize;
+        if (el('heldItemSizeInput')) el('heldItemSizeInput').value = config.heldItemSize;
+        if (el('heldItemOffsetX')) el('heldItemOffsetX').value = config.heldItemOffsetX;
+        if (el('heldItemOffsetXInput')) el('heldItemOffsetXInput').value = config.heldItemOffsetX;
+        if (el('heldItemOffsetY')) el('heldItemOffsetY').value = config.heldItemOffsetY;
+        if (el('heldItemOffsetYInput')) el('heldItemOffsetYInput').value = config.heldItemOffsetY;
+        if (el('heldItemBackground')) el('heldItemBackground').checked = config.heldItemBackground;
+        if (el('heldItemBackgroundColor')) el('heldItemBackgroundColor').value = config.heldItemBackgroundColor;
+        if (el('heldItemBorderRadius')) el('heldItemBorderRadius').value = config.heldItemBorderRadius;
+        if (el('heldItemBorderRadiusInput')) el('heldItemBorderRadiusInput').value = config.heldItemBorderRadius;
+        if (el('heldItemPadding')) el('heldItemPadding').value = config.heldItemPadding;
+        if (el('heldItemPaddingInput')) el('heldItemPaddingInput').value = config.heldItemPadding;
+        if (el('hpDisplay')) el('hpDisplay').value = config.hpDisplay;
+        if (el('hpPosition')) el('hpPosition').value = config.hpPosition;
+        for (const key of ['hpBarWidth', 'hpBarHeight', 'hpFontSize', 'hpBorderRadius']) {
+            if (el(key)) el(key).value = config[key];
+            if (el(key + 'Input')) el(key + 'Input').value = config[key];
+        }
+        for (const key of ['hpHighColor', 'hpMediumColor', 'hpLowColor', 'hpBackgroundColor', 'hpTextColor']) {
+            if (el(key)) el(key).value = config[key];
+        }
         if (el('textStroke')) el('textStroke').checked = config.textStroke;
         if (el('strokeColor')) el('strokeColor').value = config.strokeColor;
         if (el('strokeWidth')) el('strokeWidth').value = config.strokeWidth;
@@ -783,6 +1206,8 @@ function applyConfig() {
         toggleOptions('textShadowOptions', config.textShadow);
         toggleOptions('spriteShadowOptions', config.spriteShadow);
         toggleOptions('spriteStrokeOptions', config.spriteStroke);
+        toggleOptions('levelBackgroundOptions', config.levelBackground);
+        toggleOptions('heldItemBackgroundOptions', config.heldItemBackground);
         updateDeleteFontButton();
         updateOBSUrlField();
     }
@@ -791,6 +1216,7 @@ function applyConfig() {
         if (shouldShowTeam()) renderTeam(currentTeam);
         renderBadges(currentTeam);
         renderCemetery(currentTeam);
+        renderLives(currentTeam);
     }
 }
 
@@ -799,7 +1225,107 @@ function toggleOptions(id, visible) {
     if (el) el.classList.toggle('visible', !!visible);
 }
 
+function updateLivesOptionsVisibility() {
+    const isHearts = config.livesDisplay === 'hearts';
+    const numberOpts = document.getElementById('livesNumberOptions');
+    const heartOpts = document.getElementById('livesHeartOptions');
+    const gridOpts = document.getElementById('livesHeartGridOptions');
+    const hint = document.getElementById('livesShowMaxHint');
+    if (numberOpts) numberOpts.hidden = isHearts;
+    if (heartOpts) heartOpts.hidden = !isHearts;
+    if (gridOpts) gridOpts.hidden = !(isHearts && config.livesHeartLayout === 'grid');
+    if (hint) {
+        hint.textContent = isHearts
+            ? 'Corazones vacíos = vidas perdidas'
+            : 'Muestra 10/20 en lugar de solo 10';
+    }
+}
+
+function buildLivesHeartShadow() {
+    if (!config.livesHeartShadow) return 'none';
+    return `${config.livesHeartShadowX || 0}px ${config.livesHeartShadowY || 0}px ${config.livesHeartShadowBlur || 0}px ${config.livesHeartShadowColor || '#000'}`;
+}
+
+const CONFIG_TAB_STORAGE_KEY = 'pokelayout-active-config-tab';
+const CONFIG_TABS = ['general', 'appearance', 'nuzlocke', 'obs'];
+
+function activateConfigTab(tabName, { focus = false, persist = true } = {}) {
+    const activeTab = CONFIG_TABS.includes(tabName) ? tabName : CONFIG_TABS[0];
+    const tabs = [...document.querySelectorAll('[data-config-tab]')];
+    const sections = document.querySelectorAll('[data-config-group]');
+    const description = document.getElementById('configTabDescription');
+    const panel = document.getElementById('configBody');
+
+    tabs.forEach(tab => {
+        const isActive = tab.dataset.configTab === activeTab;
+        tab.classList.toggle('active', isActive);
+        tab.setAttribute('aria-selected', String(isActive));
+        tab.tabIndex = isActive ? 0 : -1;
+        if (isActive) {
+            if (description) description.textContent = tab.dataset.description || '';
+            if (panel) panel.setAttribute('aria-labelledby', tab.id);
+            if (focus) tab.focus();
+        }
+    });
+
+    sections.forEach(section => {
+        section.hidden = section.dataset.configGroup !== activeTab;
+    });
+
+    if (persist) {
+        try {
+            localStorage.setItem(CONFIG_TAB_STORAGE_KEY, activeTab);
+        } catch {
+            // La navegación sigue funcionando aunque el almacenamiento esté bloqueado.
+        }
+    }
+}
+
+function setupConfigTabs() {
+    const tabs = [...document.querySelectorAll('[data-config-tab]')];
+    if (!tabs.length) return;
+
+    let savedTab = CONFIG_TABS[0];
+    try {
+        savedTab = localStorage.getItem(CONFIG_TAB_STORAGE_KEY) || savedTab;
+    } catch {
+        // Mantener la pestaña inicial si localStorage no está disponible.
+    }
+    activateConfigTab(savedTab, { persist: false });
+
+    tabs.forEach((tab, index) => {
+        tab.addEventListener('click', () => activateConfigTab(tab.dataset.configTab));
+        tab.addEventListener('keydown', event => {
+            let nextIndex = null;
+            if (event.key === 'ArrowRight' || event.key === 'ArrowDown') nextIndex = (index + 1) % tabs.length;
+            if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') nextIndex = (index - 1 + tabs.length) % tabs.length;
+            if (event.key === 'Home') nextIndex = 0;
+            if (event.key === 'End') nextIndex = tabs.length - 1;
+            if (nextIndex === null) return;
+            event.preventDefault();
+            activateConfigTab(tabs[nextIndex].dataset.configTab, { focus: true });
+        });
+    });
+}
+
 function setupConfigListeners() {
+    setupConfigTabs();
+
+    [
+        ['levelFontFamily', 'levelFontFamily'],
+        ['levelFormat', 'levelFormat'],
+        ['heldItemPosition', 'heldItemPosition'],
+        ['hpDisplay', 'hpDisplay'],
+        ['hpPosition', 'hpPosition']
+    ].forEach(([id, key]) => {
+        const control = document.getElementById(id);
+        if (control) control.addEventListener('change', e => {
+            config[key] = e.target.value;
+            saveConfig();
+            applyConfig();
+        });
+    });
+
     document.querySelectorAll('[data-layout]').forEach(btn => {
         btn.addEventListener('click', () => {
             config.layout = btn.dataset.layout;
@@ -824,7 +1350,7 @@ function setupConfigListeners() {
         });
     });
     
-    ['showNickname', 'showLevel', 'showHP', 'showShiny'].forEach(id => {
+    ['showNickname', 'showLevel', 'showHP', 'showShiny', 'showHeldItem'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.addEventListener('change', e => {
             config[id] = e.target.checked;
@@ -834,6 +1360,102 @@ function setupConfigListeners() {
     });
 
     bindCheckbox('deathAnimation', 'deathAnimation');
+    bindCheckbox('splitSlots', 'splitSlots');
+    bindCheckbox('levelBackground', 'levelBackground');
+    bindCheckbox('heldItemBackground', 'heldItemBackground');
+    bindCheckbox('livesShowMax', 'livesShowMax');
+    setupRangeInput('maxLives', 'maxLivesInput', 'maxLives');
+    setupRangeInput('livesFontSize', 'livesFontSizeInput', 'livesFontSize');
+    setupRangeInput('livesHeartSize', 'livesHeartSizeInput', 'livesHeartSize');
+    setupRangeInput('livesHeartGap', 'livesHeartGapInput', 'livesHeartGap');
+    setupRangeInput('livesHeartStrokeWidth', 'livesHeartStrokeWidthInput', 'livesHeartStrokeWidth');
+    setupRangeInput('livesHeartShadowX', 'livesHeartShadowXInput', 'livesHeartShadowX');
+    setupRangeInput('livesHeartShadowY', 'livesHeartShadowYInput', 'livesHeartShadowY');
+    setupRangeInput('livesHeartShadowBlur', 'livesHeartShadowBlurInput', 'livesHeartShadowBlur');
+    bindColor('livesColor', 'livesColor');
+    bindColor('livesMaxColor', 'livesMaxColor');
+    bindColor('livesHeartColor', 'livesHeartColor');
+    bindColor('livesHeartLostColor', 'livesHeartLostColor');
+    bindColor('livesHeartStrokeColor', 'livesHeartStrokeColor');
+    bindColor('livesHeartShadowColor', 'livesHeartShadowColor');
+
+    const livesHeartStyle = document.getElementById('livesHeartStyle');
+    if (livesHeartStyle) {
+        livesHeartStyle.addEventListener('change', e => {
+            config.livesHeartStyle = e.target.value;
+            saveConfig();
+            applyConfig();
+        });
+    }
+
+    document.querySelectorAll('input[name="livesHeartLayout"]').forEach(r => {
+        r.addEventListener('change', e => {
+            if (!e.target.checked) return;
+            const layout = e.target.value;
+            if (['row', 'column', 'grid'].includes(layout)) {
+                config.livesHeartLayout = layout;
+                saveConfig();
+                applyConfig();
+            }
+        });
+    });
+
+    document.querySelectorAll('input[name="livesHeartColumns"]').forEach(r => {
+        r.addEventListener('change', e => {
+            if (!e.target.checked) return;
+            const cols = parseInt(e.target.value, 10);
+            if ([5, 7, 10].includes(cols)) {
+                config.livesHeartColumns = cols;
+                saveConfig();
+                applyConfig();
+            }
+        });
+    });
+
+    const livesHeartStroke = document.getElementById('livesHeartStroke');
+    if (livesHeartStroke) {
+        livesHeartStroke.addEventListener('change', e => {
+            config.livesHeartStroke = e.target.checked;
+            saveConfig();
+            applyConfig();
+        });
+    }
+
+    const livesHeartShadow = document.getElementById('livesHeartShadow');
+    if (livesHeartShadow) {
+        livesHeartShadow.addEventListener('change', e => {
+            config.livesHeartShadow = e.target.checked;
+            saveConfig();
+            applyConfig();
+        });
+    }
+
+    document.querySelectorAll('input[name="livesDisplay"]').forEach(r => {
+        r.addEventListener('change', e => {
+            if (!e.target.checked) return;
+            config.livesDisplay = e.target.value === 'hearts' ? 'hearts' : 'number';
+            saveConfig();
+            applyConfig();
+        });
+    });
+
+    const livesFontFamily = document.getElementById('livesFontFamily');
+    if (livesFontFamily) {
+        livesFontFamily.addEventListener('change', e => {
+            config.livesFontFamily = e.target.value;
+            saveConfig();
+            applyConfig();
+        });
+    }
+
+    const showLivesPreview = document.getElementById('showLivesPreview');
+    if (showLivesPreview) {
+        showLivesPreview.addEventListener('change', e => {
+            config.showLives = e.target.checked;
+            saveConfig();
+            applyConfig();
+        });
+    }
 
     const previewDeathAnimBtn = document.getElementById('previewDeathAnimBtn');
     if (previewDeathAnimBtn) {
@@ -902,6 +1524,27 @@ function setupConfigListeners() {
     bindCheckbox('cemeteryGrayscale', 'cemeteryGrayscale');
 
     setupRangeInput('nameOffsetY', 'nameOffsetYInput', 'nameOffsetY');
+    setupRangeInput('levelFontSize', 'levelFontSizeInput', 'levelFontSize');
+    setupRangeInput('levelOffsetX', 'levelOffsetXInput', 'levelOffsetX');
+    setupRangeInput('levelOffsetY', 'levelOffsetYInput', 'levelOffsetY');
+    setupRangeInput('levelBorderRadius', 'levelBorderRadiusInput', 'levelBorderRadius');
+    setupRangeInput('levelPadding', 'levelPaddingInput', 'levelPadding');
+    setupRangeInput('heldItemSize', 'heldItemSizeInput', 'heldItemSize');
+    setupRangeInput('heldItemOffsetX', 'heldItemOffsetXInput', 'heldItemOffsetX');
+    setupRangeInput('heldItemOffsetY', 'heldItemOffsetYInput', 'heldItemOffsetY');
+    setupRangeInput('heldItemBorderRadius', 'heldItemBorderRadiusInput', 'heldItemBorderRadius');
+    setupRangeInput('heldItemPadding', 'heldItemPaddingInput', 'heldItemPadding');
+    setupRangeInput('hpBarWidth', 'hpBarWidthInput', 'hpBarWidth');
+    setupRangeInput('hpBarHeight', 'hpBarHeightInput', 'hpBarHeight');
+    setupRangeInput('hpFontSize', 'hpFontSizeInput', 'hpFontSize');
+    setupRangeInput('hpBorderRadius', 'hpBorderRadiusInput', 'hpBorderRadius');
+    bindColor('heldItemBackgroundColor', 'heldItemBackgroundColor');
+    bindColor('levelBackgroundColor', 'levelBackgroundColor');
+    bindColor('hpHighColor', 'hpHighColor');
+    bindColor('hpMediumColor', 'hpMediumColor');
+    bindColor('hpLowColor', 'hpLowColor');
+    bindColor('hpBackgroundColor', 'hpBackgroundColor');
+    bindColor('hpTextColor', 'hpTextColor');
     
     // Text stroke checkbox
     const textStroke = document.getElementById('textStroke');
@@ -999,11 +1642,14 @@ function setupConfigListeners() {
     if (toggleConfig) {
         toggleConfig.addEventListener('click', () => {
             const body = document.getElementById('configBody');
+            const panel = document.getElementById('configPanel');
             body.classList.toggle('collapsed');
             const collapsed = body.classList.contains('collapsed');
+            panel?.classList.toggle('is-collapsed', collapsed);
             toggleConfig.textContent = collapsed ? '+' : '−';
             toggleConfig.title = collapsed ? 'Expandir panel' : 'Contraer panel';
             toggleConfig.setAttribute('aria-label', toggleConfig.title);
+            toggleConfig.setAttribute('aria-expanded', String(!collapsed));
         });
     }
     
@@ -1047,6 +1693,33 @@ function setupConfigListeners() {
                 copyCemeteryUrlBtn.textContent = '✓ Copiado';
                 copyCemeteryUrlBtn.classList.add('copied');
                 setTimeout(() => { copyCemeteryUrlBtn.textContent = '📋 Copiar'; copyCemeteryUrlBtn.classList.remove('copied'); }, 2000);
+            });
+        });
+    }
+
+    const copyLivesUrlBtn = document.getElementById('copyLivesUrlBtn');
+    if (copyLivesUrlBtn) {
+        copyLivesUrlBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(document.getElementById('obsLivesUrl').value).then(() => {
+                copyLivesUrlBtn.textContent = '✓ Copiado';
+                copyLivesUrlBtn.classList.add('copied');
+                setTimeout(() => { copyLivesUrlBtn.textContent = '📋 Copiar'; copyLivesUrlBtn.classList.remove('copied'); }, 2000);
+            });
+        });
+    }
+
+    const slotUrls = document.getElementById('obsSlotUrls');
+    if (slotUrls) {
+        slotUrls.addEventListener('click', e => {
+            const btn = e.target.closest('[data-copy-slot]');
+            if (!btn) return;
+            const slot = btn.getAttribute('data-copy-slot');
+            const input = document.getElementById('obsSlotUrl' + slot);
+            if (!input) return;
+            navigator.clipboard.writeText(input.value).then(() => {
+                btn.textContent = '✓ Copiado';
+                btn.classList.add('copied');
+                setTimeout(() => { btn.textContent = '📋 Copiar'; btn.classList.remove('copied'); }, 2000);
             });
         });
     }
@@ -1181,27 +1854,33 @@ function refreshCustomSpriteOptions() {
 }
 
 function refreshCustomFontOptions() {
-    const group = document.getElementById('customFontsGroup');
-    const select = document.getElementById('fontFamily');
-    if (!group || !select) return;
+    const groups = [
+        { groupId: 'customFontsGroup', selectId: 'fontFamily', configKey: 'fontFamily' },
+        { groupId: 'customFontsGroupLevel', selectId: 'levelFontFamily', configKey: 'levelFontFamily' },
+        { groupId: 'customFontsGroupLives', selectId: 'livesFontFamily', configKey: 'livesFontFamily' }
+    ];
 
-    group.innerHTML = '';
-    if (!customFonts.length) {
-        group.hidden = true;
-        return;
+    for (const { groupId, selectId, configKey } of groups) {
+        const group = document.getElementById(groupId);
+        const select = document.getElementById(selectId);
+        if (!group || !select) continue;
+
+        group.innerHTML = '';
+        if (!customFonts.length) {
+            group.hidden = true;
+        } else {
+            group.hidden = false;
+            for (const font of customFonts) {
+                const opt = document.createElement('option');
+                opt.value = font.family;
+                opt.textContent = font.family;
+                group.appendChild(opt);
+            }
+        }
+
+        const exists = [...select.options].some(o => o.value === config[configKey]);
+        if (exists) select.value = config[configKey];
     }
-
-    group.hidden = false;
-    for (const font of customFonts) {
-        const opt = document.createElement('option');
-        opt.value = font.family;
-        opt.textContent = font.family;
-        group.appendChild(opt);
-    }
-
-    // Restaurar selección si sigue existiendo
-    const exists = [...select.options].some(o => o.value === config.fontFamily);
-    if (exists) select.value = config.fontFamily;
 }
 
 async function registerFontFace(family, fileName) {
@@ -1467,8 +2146,30 @@ async function fetchTeamData() {
 }
 
 function getHPInfo(cur, max) {
-    const pct = max > 0 ? (cur / max) * 100 : 100;
+    const pct = max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : 100;
     return { pct, cls: pct <= 20 ? 'hp-low' : pct <= 50 ? 'hp-medium' : 'hp-high' };
+}
+
+function formatPokemonLevel(level) {
+    if (config.levelFormat === 'long') return `Nivel ${level}`;
+    if (config.levelFormat === 'number') return String(level);
+    return `Nv.${level}`;
+}
+
+function buildPokemonHPHtml(pokemon, hp) {
+    const display = config.hpDisplay || 'bar';
+    const showBar = display === 'bar' || display.startsWith('bar-');
+    const showText = display !== 'bar';
+    const text = display.endsWith('current')
+        ? `${pokemon.currentHP} HP`
+        : `${pokemon.currentHP}/${pokemon.maxHP}`;
+
+    return `<div class="pokemon-hp hp-position-${config.hpPosition || 'below'}">`
+        + (showBar
+            ? `<div class="hp-bar-container"><div class="hp-bar ${hp.cls}" style="width:${hp.pct}%"></div></div>`
+            : '')
+        + (showText ? `<span class="hp-text">${escapeHtml(text)}</span>` : '')
+        + `</div>`;
 }
 
 function createPokemonCard(pokemon) {
@@ -1485,8 +2186,9 @@ function createPokemonCard(pokemon) {
     let nameClass = 'pokemon-name' + (hasNickname ? ' nickname' : '') + (config.textStroke ? ' has-stroke' : '');
     const levelPos = config.levelPosition || 'below';
     const levelInCorner = config.showLevel && levelPos !== 'below';
-    let levelClass = 'pokemon-level' + (config.textStroke ? ' has-stroke' : '')
-        + (levelInCorner ? ` corner corner-${levelPos}` : '');
+    let levelClass = 'pokemon-level'
+        + (levelInCorner ? ` corner corner-${levelPos}` : '')
+        + (config.levelBackground ? ' has-background' : '');
 
     const primaryUrl = getSpriteUrl(pokemon);
     const typeKey = isCustomSpriteType(config.spriteType) ? 'default' : config.spriteType;
@@ -1516,7 +2218,10 @@ function createPokemonCard(pokemon) {
             ? buildPmdPortraitUrl(pokemon.species, form, false, false, type.emotion || 'Normal')
             : FALLBACK_SPRITE);
     
+    const hpHtml = config.showHP ? buildPokemonHPHtml(pokemon, hp) : '';
+    const levelText = formatPokemonLevel(pokemon.level);
     let html = `<div class="pokemon-card">`;
+    if (hpHtml && config.hpPosition === 'above') html += hpHtml;
     if (config.showShiny && isShiny) html += `<span class="shiny-icon">✨</span>`;
 
     const onErr = isCustom
@@ -1546,12 +2251,21 @@ function createPokemonCard(pokemon) {
         }
         html += `<img src="${primaryUrl}" alt="${escapeHtml(pokemon.speciesName)}" class="${spriteClass}" style="filter:${spriteFilter}" data-fb2="${fallback2}" onerror="${onErr}">`;
     }
-    if (levelInCorner) html += `<span class="${levelClass}">Nv.${pokemon.level}</span>`;
+    if (levelInCorner) html += `<span class="${levelClass}">${escapeHtml(levelText)}</span>`;
+    if (config.showHeldItem && pokemon.heldItem) {
+        const itemLabel = formatHeldItemLabel(pokemon.heldItem);
+        const itemUrl = getHeldItemSpriteUrl(pokemon.heldItem);
+        if (itemUrl) {
+            const itemClass = `held-item-icon held-item-${config.heldItemPosition || 'bottom-right'}`
+                + (config.heldItemBackground ? ' has-background' : '');
+            html += `<img src="${itemUrl}" alt="${escapeHtml(itemLabel)}" title="${escapeHtml(itemLabel)}" class="${itemClass}" loading="lazy" onerror="this.style.display='none'">`;
+        }
+    }
     html += `</div>`;
 
     if (config.showNickname) html += `<span class="${nameClass}">${escapeHtml(displayName)}</span>`;
-    if (config.showLevel && !levelInCorner) html += `<span class="${levelClass}">Nv.${pokemon.level}</span>`;
-    if (config.showHP) html += `<div class="hp-bar-container"><div class="hp-bar ${hp.cls}" style="width:${hp.pct}%"></div></div>`;
+    if (config.showLevel && !levelInCorner) html += `<span class="${levelClass}">${escapeHtml(levelText)}</span>`;
+    if (hpHtml && config.hpPosition !== 'above') html += hpHtml;
     html += `</div>`;
     return html;
 }
@@ -1560,9 +2274,112 @@ function escapeHtml(t) { const d = document.createElement('div'); d.textContent 
 
 function renderTeam(data) {
     const c = document.getElementById('team');
-    if (!data?.team?.length) { c.innerHTML = `<div class="empty-state">Sin Pokémon</div>`; return; }
-    c.innerHTML = data.team.map(p => createPokemonCard(p)).join('');
+    let team = data?.team || [];
+    if (isSlotOnlyMode()) {
+        const slot = getObsSlot();
+        team = team.filter(p => p.slot === slot);
+        if (!team.length) {
+            c.innerHTML = `<div class="empty-state">Slot ${slot} vacío</div>`;
+            return;
+        }
+    } else if (!team.length) {
+        c.innerHTML = `<div class="empty-state">Sin Pokémon</div>`;
+        return;
+    }
+    c.innerHTML = team.map(p => createPokemonCard(p)).join('');
     setupAllSpriteSheets();
+}
+
+const HEART_ICONS = {
+    classic: {
+        viewBox: '0 0 24 24',
+        path: 'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'
+    },
+    soft: {
+        viewBox: '0 0 24 24',
+        path: 'M12 22C9.8 19.2 3 15.7 3 9.2A6.2 6.2 0 0 1 9.2 3c1.2 0 2.3.35 3.2 1.05A6.2 6.2 0 0 1 21 9.2C21 15.7 14.2 19.2 12 22z'
+    },
+    slim: {
+        viewBox: '0 0 24 24',
+        path: 'M12 22 2 11 3.6 5.5 8.2 2.5 12 6.6 15.8 2.5 20.4 5.5 22 11 12 22z'
+    },
+    wide: {
+        viewBox: '0 0 32 24',
+        path: 'M16 22l-1.2-1.1C10.2 16.8 8 14.4 8 10.8A4.8 4.8 0 0 1 16 7.2a4.8 4.8 0 0 1 8 3.6c0 3.6-2.2 6-6.8 10.1L16 22zM8.9 8.1C6.1 5.2 3.1 3.9.5 4.3 1.9 5.6 2.8 6.8 3.4 8L0 8.7c1.6 1.4 3.8 2.2 7.2 2.4.1-1.1.7-2.2 1.7-3zM23.1 8.1c2.8-2.9 5.8-4.2 8.4-3.8-1.4 1.3-2.3 2.5-2.9 3.7l3.4.7c-1.6 1.4-3.8 2.2-7.2 2.4-.1-1.1-.7-2.2-1.7-3z'
+    },
+    pixel: {
+        viewBox: '0 0 24 24',
+        path: 'M8 3h4v3h1V3h4v2h3v3h2v6h-2v3h-3v2h-2v2H9v-2H7v-2H4v-3H2V8h2V5h4V3z'
+    },
+    bubble: {
+        viewBox: '0 0 28 24',
+        path: 'M14 22c-5.1-4.2-8.5-7-8.5-11.2A5.3 5.3 0 0 1 14 6.6a5.3 5.3 0 0 1 8.5 4.2C22.5 15 19.1 17.8 14 22zM3 1l.8 2.2L6 4l-2.2.8L3 7l-.8-2.2L0 4l2.2-.8L3 1zm22 2 .6 1.7 1.7.6-1.7.6L25 7.6l-.6-1.7-1.7-.6 1.7-.6L25 3z'
+    },
+    outline: {
+        viewBox: '0 0 24 24',
+        path: 'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'
+    }
+};
+
+function getHeartIcon() {
+    return HEART_ICONS[config.livesHeartStyle] || HEART_ICONS.classic;
+}
+
+function buildLifeHeartSvg(lost) {
+    const style = config.livesHeartStyle || 'classic';
+    const icon = getHeartIcon();
+    const outlineOnly = style === 'outline';
+    const cls = 'life-heart'
+        + (lost ? ' lost' : ' filled')
+        + (outlineOnly ? ' outline-style' : '')
+        + (style === 'pixel' ? ' pixel-style' : '')
+        + ` heart-style-${style}`;
+
+    return `<span class="${cls}" aria-hidden="true">`
+        + `<svg viewBox="${icon.viewBox}" focusable="false">`
+        + `<path d="${icon.path}"/>`
+        + `</svg></span>`;
+}
+
+function renderLives(data) {
+    const wrapper = document.getElementById('livesWrapper');
+    const counter = document.getElementById('livesCounter');
+    if (!wrapper || !counter) return;
+
+    if (!shouldShowLives()) {
+        wrapper.hidden = true;
+        counter.innerHTML = '';
+        return;
+    }
+
+    const max = Math.max(0, Number(config.maxLives) || 0);
+    const remaining = getLivesRemaining(data);
+    const lost = Math.max(0, max - remaining);
+    const showMax = !!config.livesShowMax;
+
+    if (config.livesDisplay === 'hearts') {
+        const layout = ['row', 'column', 'grid'].includes(config.livesHeartLayout)
+            ? config.livesHeartLayout
+            : 'row';
+        const filled = Array.from({ length: remaining }, () => buildLifeHeartSvg(false)).join('');
+        const empty = showMax
+            ? Array.from({ length: lost }, () => buildLifeHeartSvg(true)).join('')
+            : '';
+        counter.className = `lives-counter lives-hearts layout-${layout}`;
+        counter.innerHTML = filled + empty || `<span class="lives-remaining">0</span>`;
+    } else {
+        counter.className = 'lives-counter lives-number';
+        let html = `<span class="lives-remaining">${remaining}</span>`;
+        if (showMax) html += `<span class="lives-max">/ ${max}</span>`;
+        counter.innerHTML = html;
+    }
+
+    wrapper.hidden = false;
+    wrapper.classList.toggle('lives-empty', remaining === 0);
+    wrapper.classList.toggle('lives-mode-hearts', config.livesDisplay === 'hearts');
+    wrapper.classList.toggle('lives-mode-number', config.livesDisplay !== 'hearts');
+    wrapper.classList.toggle('lives-heart-stroke', !!config.livesHeartStroke || config.livesHeartStyle === 'outline');
+    wrapper.classList.toggle('lives-heart-shadow', !!config.livesHeartShadow);
 }
 
 function createCemeterySprite(pokemon) {
@@ -1845,6 +2662,7 @@ async function updateOverlay() {
         });
     }
     renderCemetery(t);
+    renderLives(t);
 
     if (newlyFainted.length) playDeathAnimation(newlyFainted);
 }

@@ -47,7 +47,8 @@ body {
     position: fixed;
     top: 10px;
     right: 10px;
-    width: 340px;
+    width: 380px;
+    max-width: calc(100vw - 20px);
     max-height: 95vh;
     overflow-y: auto;
     background: var(--bg-dark);
@@ -127,22 +128,89 @@ body {
 }
 
 .config-body {
-    padding: 10px 12px 14px;
+    padding: 12px 14px 16px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
 }
 
 .config-body.collapsed {
     display: none;
 }
 
+.config-panel.is-collapsed .config-tabs {
+    display: none;
+}
+
+/* Navegación principal del panel */
+.config-tabs {
+    position: sticky;
+    top: 57px;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    padding: 9px 10px;
+    background: rgba(15, 15, 25, 0.98);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    backdrop-filter: blur(8px);
+}
+
+.config-tab {
+    min-width: 0;
+    min-height: 38px;
+    padding: 8px 5px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.15;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.config-tab:hover {
+    color: var(--text-primary);
+    background: rgba(255,255,255,0.06);
+}
+
+.config-tab.active {
+    color: #ffffff;
+    background: rgba(99,102,241,0.2);
+    border-color: rgba(129,140,248,0.55);
+}
+
+.config-tab:focus-visible,
+.config-toggle:focus-visible,
+.config-section-title:focus-visible,
+.config-panel button:focus-visible,
+.config-panel select:focus-visible,
+.config-panel input:focus-visible {
+    outline: 2px solid #a5b4fc;
+    outline-offset: 2px;
+}
+
+.config-tab-description {
+    margin: 0 2px 2px;
+    color: var(--text-secondary);
+    font-size: 11px;
+    line-height: 1.45;
+}
+
 /* Secciones colapsables */
 .config-section {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 10px;
+    background: rgba(255,255,255,0.035);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 11px;
     overflow: hidden;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.config-section[open] {
+    background: rgba(255,255,255,0.045);
+    border-color: rgba(129,140,248,0.32);
 }
 
 .config-section-title {
@@ -151,7 +219,8 @@ body {
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    padding: 12px 14px;
+    min-height: 46px;
+    padding: 13px 14px;
     cursor: pointer;
     user-select: none;
     color: var(--text-primary);
@@ -169,7 +238,7 @@ body {
 }
 
 .config-section-title:hover {
-    background: rgba(255,255,255,0.04);
+    background: rgba(255,255,255,0.055);
 }
 
 .config-section-label {
@@ -196,10 +265,10 @@ body {
 .config-section-body {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    padding: 0 12px 14px;
+    gap: 16px;
+    padding: 0 14px 16px;
     border-top: 1px solid rgba(255,255,255,0.06);
-    padding-top: 12px;
+    padding-top: 14px;
 }
 
 .config-group {
@@ -551,6 +620,10 @@ input[type="range"]::-webkit-slider-thumb {
     gap: 8px;
 }
 
+.color-grid.single-color-grid {
+    grid-template-columns: 1fr;
+}
+
 .color-item {
     display: flex;
     flex-direction: column;
@@ -855,6 +928,19 @@ input[type="range"]::-webkit-slider-thumb {
     line-height: 1.4;
 }
 
+.obs-slot-urls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.obs-slot-row label {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
 /* ═══════════════════════════════════════════════════════════════
    Team Container
    ═══════════════════════════════════════════════════════════════ */
@@ -1110,12 +1196,24 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 .pokemon-level {
-    font-size: calc(var(--font-size) - 1px);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--level-font-family, var(--font-family));
+    font-size: var(--level-font-size, 10px);
+    font-weight: 600;
     color: var(--color-level);
-    text-shadow: var(--text-fx-shadow, none);
-    text-transform: var(--text-transform, none);
+    text-shadow: none;
     line-height: 1;
     white-space: nowrap;
+    transform: translate(var(--level-offset-x, 0), var(--level-offset-y, 0));
+}
+
+.pokemon-level.has-background {
+    padding: var(--level-padding, 3px);
+    background: var(--level-background, #111827);
+    border-radius: var(--level-radius, 6px);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.35);
 }
 
 .pokemon-level.corner {
@@ -1132,6 +1230,18 @@ input[type="range"]::-webkit-slider-thumb {
 .pokemon-level.corner-top-right {
     top: 0;
     right: 0;
+}
+
+.pokemon-level.corner-left {
+    top: 50%;
+    left: 0;
+    transform: translate(var(--level-offset-x, 0), calc(-50% + var(--level-offset-y, 0px)));
+}
+
+.pokemon-level.corner-right {
+    top: 50%;
+    right: 0;
+    transform: translate(var(--level-offset-x, 0), calc(-50% + var(--level-offset-y, 0px)));
 }
 
 .pokemon-level.corner-bottom-left {
@@ -1157,24 +1267,106 @@ input[type="range"]::-webkit-slider-thumb {
     top: 14px;
 }
 
-/* HP Bar */
+.held-item-icon {
+    position: absolute;
+    width: var(--held-item-size, 22px);
+    height: var(--held-item-size, 22px);
+    box-sizing: border-box;
+    object-fit: contain;
+    image-rendering: pixelated;
+    z-index: 4;
+    pointer-events: none;
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.65));
+}
+
+.held-item-icon.has-background {
+    padding: var(--held-item-padding, 3px);
+    background: var(--held-item-background, #111827);
+    border-radius: var(--held-item-radius, 8px);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+}
+
+.held-item-top-left {
+    top: var(--sprite-fx-pad, 4px);
+    left: var(--sprite-fx-pad, 4px);
+    transform: translate(var(--held-item-offset-x, 0), var(--held-item-offset-y, 0));
+}
+
+.held-item-top-right {
+    top: var(--sprite-fx-pad, 4px);
+    right: var(--sprite-fx-pad, 4px);
+    transform: translate(var(--held-item-offset-x, 0), var(--held-item-offset-y, 0));
+}
+
+.held-item-left {
+    top: 50%;
+    left: var(--sprite-fx-pad, 4px);
+    transform: translate(var(--held-item-offset-x, 0), calc(-50% + var(--held-item-offset-y, 0px)));
+}
+
+.held-item-right {
+    top: 50%;
+    right: var(--sprite-fx-pad, 4px);
+    transform: translate(var(--held-item-offset-x, 0), calc(-50% + var(--held-item-offset-y, 0px)));
+}
+
+.held-item-bottom-left {
+    bottom: var(--sprite-fx-pad, 4px);
+    left: var(--sprite-fx-pad, 4px);
+    transform: translate(var(--held-item-offset-x, 0), var(--held-item-offset-y, 0));
+}
+
+.held-item-bottom-right {
+    right: var(--sprite-fx-pad, 4px);
+    bottom: var(--sprite-fx-pad, 4px);
+    transform: translate(var(--held-item-offset-x, 0), var(--held-item-offset-y, 0));
+}
+
+/* HP del Pokémon */
+.pokemon-hp {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    width: var(--hp-width, 64px);
+    max-width: 100%;
+}
+
+.pokemon-hp.hp-position-above {
+    margin-bottom: 2px;
+}
+
+.pokemon-hp.hp-position-below {
+    margin-top: 2px;
+}
+
 .hp-bar-container {
-    width: 100%;
-    height: 4px;
-    background: rgba(0,0,0,0.3);
-    border-radius: 2px;
+    width: var(--hp-width, 64px);
+    height: var(--hp-height, 5px);
+    background: var(--hp-background-color, #1f2937);
+    border-radius: var(--hp-radius, 3px);
     overflow: hidden;
-    margin-top: 4px;
 }
 
 .hp-bar {
     height: 100%;
-    border-radius: 2px;
+    border-radius: inherit;
+    transition: width 0.2s ease;
 }
 
-.hp-bar.hp-high { background: #22c55e; }
-.hp-bar.hp-medium { background: #eab308; }
-.hp-bar.hp-low { background: #ef4444; }
+.hp-text {
+    color: var(--hp-text-color, #f8fafc);
+    font-family: var(--level-font-family, var(--font-family));
+    font-size: var(--hp-font-size, 10px);
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.7);
+}
+
+.hp-bar.hp-high { background: var(--hp-high-color, #22c55e); }
+.hp-bar.hp-medium { background: var(--hp-medium-color, #eab308); }
+.hp-bar.hp-low { background: var(--hp-low-color, #ef4444); }
 
 /* ═══════════════════════════════════════════════════════════════
    States
@@ -1212,26 +1404,39 @@ body.obs-badges-only .team-wrapper {
     display: none;
 }
 
-body.obs-mode:not(.obs-badges-only):not(.obs-death-only):not(.obs-cemetery-only) .badges-wrapper {
+body.obs-mode:not(.obs-badges-only):not(.obs-death-only):not(.obs-cemetery-only):not(.obs-lives-only) .badges-wrapper {
     display: none;
 }
 
-body.obs-mode:not(.obs-badges-only):not(.obs-death-only):not(.obs-cemetery-only) .cemetery-wrapper {
+body.obs-mode:not(.obs-badges-only):not(.obs-death-only):not(.obs-cemetery-only):not(.obs-lives-only) .cemetery-wrapper {
+    display: none;
+}
+
+body.obs-mode:not(.obs-badges-only):not(.obs-death-only):not(.obs-cemetery-only):not(.obs-lives-only) .lives-wrapper {
     display: none;
 }
 
 body.obs-death-only .team-wrapper,
 body.obs-death-only .badges-wrapper,
-body.obs-death-only .cemetery-wrapper {
+body.obs-death-only .cemetery-wrapper,
+body.obs-death-only .lives-wrapper {
     display: none !important;
 }
 
 body.obs-cemetery-only .team-wrapper,
-body.obs-cemetery-only .badges-wrapper {
+body.obs-cemetery-only .badges-wrapper,
+body.obs-cemetery-only .lives-wrapper {
     display: none !important;
 }
 
-body.obs-badges-only .cemetery-wrapper {
+body.obs-lives-only .team-wrapper,
+body.obs-lives-only .badges-wrapper,
+body.obs-lives-only .cemetery-wrapper {
+    display: none !important;
+}
+
+body.obs-badges-only .cemetery-wrapper,
+body.obs-badges-only .lives-wrapper {
     display: none !important;
 }
 
@@ -1257,6 +1462,152 @@ body.obs-badges-only .cemetery-wrapper {
     background: rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(10px);
     border-radius: 8px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Contador de vidas
+   ═══════════════════════════════════════════════════════════════ */
+
+.lives-wrapper {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 8px;
+    width: fit-content;
+    max-width: 100%;
+}
+
+.lives-wrapper.bg-dark {
+    background: rgba(15, 23, 42, 0.85);
+    border-radius: 8px;
+}
+
+.lives-wrapper.bg-glass {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(10px);
+    border-radius: 8px;
+}
+
+.lives-counter {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    line-height: 1;
+}
+
+.lives-counter.lives-number {
+    font-family: var(--lives-font-family, var(--font-family));
+}
+
+.lives-remaining {
+    font-size: var(--lives-font-size, 28px);
+    font-weight: 700;
+    color: var(--lives-color, #f8fafc);
+}
+
+.lives-max {
+    font-size: calc(var(--lives-font-size, 28px) * 0.55);
+    font-weight: 500;
+    color: var(--lives-max-color, #94a3b8);
+}
+
+.lives-wrapper.lives-empty .lives-remaining {
+    color: #f87171;
+}
+
+.lives-counter.lives-hearts {
+    align-items: center;
+    gap: var(--lives-heart-gap, 4px);
+    max-width: 100%;
+}
+
+.lives-counter.lives-hearts.layout-row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.lives-counter.lives-hearts.layout-column {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+}
+
+.lives-counter.lives-hearts.layout-grid {
+    display: grid;
+    grid-template-columns: repeat(var(--lives-heart-cols, 5), var(--lives-heart-size, 22px));
+    justify-content: start;
+    align-content: start;
+}
+
+.life-heart {
+    display: inline-flex;
+    width: var(--lives-heart-size, 22px);
+    height: var(--lives-heart-size, 22px);
+    flex-shrink: 0;
+    color: var(--lives-heart-color, #ef4444);
+}
+
+.life-heart.lost {
+    color: var(--lives-heart-lost-color, #475569);
+}
+
+.life-heart svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow: visible;
+}
+
+.lives-wrapper.lives-heart-shadow .life-heart svg {
+    filter: drop-shadow(var(--lives-heart-shadow, none));
+}
+
+.life-heart.filled svg {
+    fill: var(--lives-heart-color, #ef4444);
+}
+
+.life-heart.lost svg {
+    fill: var(--lives-heart-lost-color, #475569);
+    opacity: 0.9;
+}
+
+.life-heart.outline-style.filled svg,
+.life-heart.outline-style.lost svg {
+    fill: none;
+}
+
+.life-heart.outline-style svg path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: var(--lives-heart-stroke-width, 1.5px);
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+}
+
+.life-heart.outline-style.filled {
+    color: var(--lives-heart-color, #ef4444);
+}
+
+.life-heart.outline-style.lost {
+    color: var(--lives-heart-lost-color, #475569);
+}
+
+.life-heart.pixel-style svg {
+    shape-rendering: crispEdges;
+}
+
+.lives-wrapper.lives-heart-stroke .life-heart:not(.outline-style) svg path {
+    stroke: var(--lives-heart-stroke-color, #000);
+    stroke-width: var(--lives-heart-stroke-width, 1.5px);
+    stroke-linejoin: round;
+    paint-order: stroke fill;
+    vector-effect: non-scaling-stroke;
+}
+
+body.obs-mode .lives-wrapper {
+    padding: 0;
 }
 
 .cemetery-grid {
@@ -1424,4 +1775,44 @@ body.obs-mode .cemetery-wrapper {
 body.obs-badges-only .death-overlay,
 body.obs-cemetery-only .death-overlay {
     display: none !important;
+}
+
+@media (max-width: 480px) {
+    .config-panel {
+        top: 8px;
+        right: 8px;
+        width: calc(100vw - 16px);
+        max-width: none;
+        max-height: calc(100vh - 16px);
+        border-radius: 12px;
+    }
+
+    .config-tabs {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        top: 57px;
+    }
+
+    .config-tab {
+        min-height: 40px;
+        font-size: 12px;
+    }
+
+    .config-body {
+        padding: 12px;
+    }
+
+    .config-section-title {
+        min-height: 48px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .config-panel *,
+    .config-panel *::before,
+    .config-panel *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+    }
 }

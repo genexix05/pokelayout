@@ -18,14 +18,40 @@
                 <span class="config-header-icon" aria-hidden="true">⚙</span>
                 <span>Configuración</span>
             </div>
-            <button class="config-toggle" id="toggleConfig" type="button" title="Contraer panel" aria-label="Contraer panel">−</button>
+            <button class="config-toggle" id="toggleConfig" type="button" title="Contraer panel"
+                    aria-label="Contraer panel" aria-expanded="true" aria-controls="configBody">−</button>
         </div>
-        <div class="config-body" id="configBody">
+        <nav class="config-tabs" role="tablist" aria-label="Secciones de configuración">
+            <button class="config-tab active" id="configTabGeneral" type="button" role="tab"
+                    aria-selected="true" aria-controls="configBody" tabindex="0" data-config-tab="general"
+                    data-description="Organiza el equipo y elige qué información aparece.">
+                General
+            </button>
+            <button class="config-tab" id="configTabAppearance" type="button" role="tab"
+                    aria-selected="false" aria-controls="configBody" tabindex="-1" data-config-tab="appearance"
+                    data-description="Personaliza sprites, tipografía, colores y efectos.">
+                Apariencia
+            </button>
+            <button class="config-tab" id="configTabNuzlocke" type="button" role="tab"
+                    aria-selected="false" aria-controls="configBody" tabindex="-1" data-config-tab="nuzlocke"
+                    data-description="Configura vidas, medallas, cementerio y derrotas.">
+                Nuzlocke
+            </button>
+            <button class="config-tab" id="configTabObs" type="button" role="tab"
+                    aria-selected="false" aria-controls="configBody" tabindex="-1" data-config-tab="obs"
+                    data-description="Copia las fuentes listas para usar en OBS.">
+                OBS
+            </button>
+        </nav>
+        <div class="config-body" id="configBody" role="tabpanel" aria-labelledby="configTabGeneral">
+            <p class="config-tab-description" id="configTabDescription" aria-live="polite">
+                Organiza el equipo y elige qué información aparece.
+            </p>
 
             <!-- ── Disposición ── -->
-            <details class="config-section" open>
+            <details class="config-section" data-config-group="general" open>
                 <summary class="config-section-title">
-                    <span class="config-section-label">1 · Disposición</span>
+                    <span class="config-section-label">Disposición</span>
                     <span class="config-section-chevron" aria-hidden="true"></span>
                 </summary>
                 <div class="config-section-body">
@@ -103,9 +129,9 @@
             </details>
 
             <!-- ── Contenido ── -->
-            <details class="config-section" open>
+            <details class="config-section" data-config-group="general">
                 <summary class="config-section-title">
-                    <span class="config-section-label">2 · Qué mostrar</span>
+                    <span class="config-section-label">Qué mostrar</span>
                     <span class="config-section-chevron" aria-hidden="true"></span>
                 </summary>
                 <div class="config-section-body">
@@ -129,13 +155,289 @@
                                 <input type="checkbox" id="showShiny" checked>
                                 <span>Shiny ✨</span>
                             </label>
+                            <label class="config-chip">
+                                <input type="checkbox" id="showHeldItem">
+                                <span>Objeto</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <!-- ── Vidas (Nuzlocke) ── -->
+            <details class="config-section" data-config-group="nuzlocke" open hidden>
+                <summary class="config-section-title">
+                    <span class="config-section-label">Vidas</span>
+                    <span class="config-section-chevron" aria-hidden="true"></span>
+                </summary>
+                <div class="config-section-body">
+                    <p class="config-section-hint">Restantes = máximas − debilitados en el equipo − Pokémon en el cementerio (última caja). El estilo de este bloque es independiente del texto del equipo.</p>
+                    <div class="config-group">
+                        <label class="effect-toggle">
+                            <input type="checkbox" id="showLivesPreview">
+                            <span class="effect-toggle-ui"></span>
+                            <span class="effect-toggle-text">
+                                <strong>Vista previa aquí</strong>
+                                <small>En OBS usa la URL de vidas (fuente aparte)</small>
+                            </span>
+                        </label>
+                    </div>
+                    <div class="config-group" id="livesOptions">
+                        <div class="slider-header">
+                            <label for="maxLives">Vidas máximas</label>
+                            <div class="slider-value">
+                                <input type="number" id="maxLivesInput" value="20" min="1" max="200" class="config-number">
+                            </div>
+                        </div>
+                        <input type="range" id="maxLives" min="1" max="200" value="20">
+                    </div>
+
+                    <div class="config-group">
+                        <label>Estilo de visualización</label>
+                        <div class="config-chips" role="group" aria-label="Estilo de vidas">
+                            <label class="config-chip">
+                                <input type="radio" name="livesDisplay" value="number" checked>
+                                <span>Número</span>
+                            </label>
+                            <label class="config-chip">
+                                <input type="radio" name="livesDisplay" value="hearts">
+                                <span>Corazones</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="config-group">
+                        <label class="effect-toggle">
+                            <input type="checkbox" id="livesShowMax" checked>
+                            <span class="effect-toggle-ui"></span>
+                            <span class="effect-toggle-text">
+                                <strong>Mostrar máximo</strong>
+                                <small id="livesShowMaxHint">Número: 10/20 · Corazones: vacíos = perdidas</small>
+                            </span>
+                        </label>
+                    </div>
+
+                    <div id="livesNumberOptions">
+                        <div class="config-group">
+                            <label for="livesFontFamily">Fuente</label>
+                            <select id="livesFontFamily" class="config-select">
+                                <optgroup id="customFontsGroupLives" label="── Tus fuentes ──" hidden></optgroup>
+                                <optgroup label="── Modernas ──">
+                                    <option value="Inter">Inter</option>
+                                    <option value="Poppins">Poppins</option>
+                                    <option value="Montserrat">Montserrat</option>
+                                    <option value="Roboto">Roboto</option>
+                                    <option value="Open Sans">Open Sans</option>
+                                    <option value="Lato">Lato</option>
+                                    <option value="Nunito">Nunito</option>
+                                    <option value="Quicksand">Quicksand</option>
+                                    <option value="Lexend">Lexend</option>
+                                    <option value="DM Sans">DM Sans</option>
+                                    <option value="Outfit">Outfit</option>
+                                    <option value="Sora">Sora</option>
+                                    <option value="Work Sans">Work Sans</option>
+                                    <option value="Barlow">Barlow</option>
+                                </optgroup>
+                                <optgroup label="── Geométricas ──">
+                                    <option value="Raleway">Raleway</option>
+                                    <option value="Ubuntu">Ubuntu</option>
+                                    <option value="Rubik">Rubik</option>
+                                    <option value="Space Grotesk">Space Grotesk</option>
+                                    <option value="Comfortaa">Comfortaa</option>
+                                    <option value="Fredoka" selected>Fredoka</option>
+                                </optgroup>
+                                <optgroup label="── Gaming / Futuristas ──">
+                                    <option value="Orbitron">Orbitron</option>
+                                    <option value="Exo 2">Exo 2</option>
+                                    <option value="Audiowide">Audiowide</option>
+                                    <option value="Teko">Teko</option>
+                                    <option value="Oswald">Oswald</option>
+                                    <option value="Kanit">Kanit</option>
+                                    <option value="Titillium Web">Titillium Web</option>
+                                    <option value="Chakra Petch">Chakra Petch</option>
+                                    <option value="Play">Play</option>
+                                </optgroup>
+                                <optgroup label="── Display / Impacto ──">
+                                    <option value="Bebas Neue">Bebas Neue</option>
+                                    <option value="Russo One">Russo One</option>
+                                    <option value="Righteous">Righteous</option>
+                                    <option value="Bangers">Bangers</option>
+                                    <option value="Bungee">Bungee</option>
+                                </optgroup>
+                                <optgroup label="── Pixel / Retro ──">
+                                    <option value="Press Start 2P">Press Start 2P</option>
+                                    <option value="VT323">VT323</option>
+                                    <option value="Silkscreen">Silkscreen</option>
+                                    <option value="Pixelify Sans">Pixelify Sans</option>
+                                    <option value="Share Tech Mono">Share Tech Mono</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div class="config-group">
+                            <div class="slider-header">
+                                <label for="livesFontSize">Tamaño del número</label>
+                                <div class="slider-value">
+                                    <input type="number" id="livesFontSizeInput" value="28" min="10" max="120" class="config-number">
+                                    <span class="unit">px</span>
+                                </div>
+                            </div>
+                            <input type="range" id="livesFontSize" min="10" max="120" value="28">
+                        </div>
+                        <div class="config-group">
+                            <label>Colores del número</label>
+                            <div class="color-grid">
+                                <div class="color-item">
+                                    <span>Restantes</span>
+                                    <input type="color" id="livesColor" value="#f8fafc">
+                                </div>
+                                <div class="color-item">
+                                    <span>Máximo</span>
+                                    <input type="color" id="livesMaxColor" value="#94a3b8">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="livesHeartOptions" hidden>
+                        <div class="config-group">
+                            <label for="livesHeartStyle">Tipo de corazón</label>
+                            <select id="livesHeartStyle" class="config-select">
+                                <option value="classic">Clásico</option>
+                                <option value="soft">Redondeado</option>
+                                <option value="slim">Cristal</option>
+                                <option value="wide">Alado</option>
+                                <option value="pixel">Píxel retro</option>
+                                <option value="bubble">Mágico</option>
+                                <option value="outline">Solo contorno</option>
+                            </select>
+                            <span class="obs-hint">Cada estilo tiene una silueta propia y se conserva también en OBS.</span>
+                        </div>
+
+                        <div class="config-group">
+                            <label>Disposición</label>
+                            <div class="config-chips" role="group" aria-label="Disposición de corazones">
+                                <label class="config-chip">
+                                    <input type="radio" name="livesHeartLayout" value="row" checked>
+                                    <span>Fila</span>
+                                </label>
+                                <label class="config-chip">
+                                    <input type="radio" name="livesHeartLayout" value="column">
+                                    <span>Columna</span>
+                                </label>
+                                <label class="config-chip">
+                                    <input type="radio" name="livesHeartLayout" value="grid">
+                                    <span>Cuadrícula</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="config-group" id="livesHeartGridOptions" hidden>
+                            <label>Columnas de la cuadrícula</label>
+                            <div class="config-chips" role="group" aria-label="Columnas de corazones">
+                                <label class="config-chip">
+                                    <input type="radio" name="livesHeartColumns" value="5" checked>
+                                    <span>5</span>
+                                </label>
+                                <label class="config-chip">
+                                    <input type="radio" name="livesHeartColumns" value="7">
+                                    <span>7</span>
+                                </label>
+                                <label class="config-chip">
+                                    <input type="radio" name="livesHeartColumns" value="10">
+                                    <span>10</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="config-group">
+                            <div class="slider-header">
+                                <label for="livesHeartSize">Tamaño del corazón</label>
+                                <div class="slider-value">
+                                    <input type="number" id="livesHeartSizeInput" value="22" min="10" max="80" class="config-number">
+                                    <span class="unit">px</span>
+                                </div>
+                            </div>
+                            <input type="range" id="livesHeartSize" min="10" max="80" value="22">
+                        </div>
+                        <div class="config-group">
+                            <div class="slider-header">
+                                <label for="livesHeartGap">Espaciado</label>
+                                <div class="slider-value">
+                                    <input type="number" id="livesHeartGapInput" value="4" min="0" max="40" class="config-number">
+                                    <span class="unit">px</span>
+                                </div>
+                            </div>
+                            <input type="range" id="livesHeartGap" min="0" max="40" value="4">
+                        </div>
+                        <div class="config-group">
+                            <label>Colores de corazones</label>
+                            <div class="color-grid">
+                                <div class="color-item">
+                                    <span>Vivas</span>
+                                    <input type="color" id="livesHeartColor" value="#ef4444">
+                                </div>
+                                <div class="color-item">
+                                    <span>Perdidas</span>
+                                    <input type="color" id="livesHeartLostColor" value="#475569">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="config-group effect-group">
+                            <label class="effect-toggle">
+                                <input type="checkbox" id="livesHeartStroke">
+                                <span class="effect-toggle-ui"></span>
+                                <span class="effect-toggle-text">
+                                    <strong>Borde</strong>
+                                    <small>Contorno alrededor del corazón</small>
+                                </span>
+                            </label>
+                            <div class="stroke-options" id="livesHeartStrokeOptions">
+                                <div class="stroke-row">
+                                    <span>Color</span>
+                                    <input type="color" id="livesHeartStrokeColor" value="#000000">
+                                </div>
+                                <div class="stroke-row">
+                                    <span>Grosor <input type="number" id="livesHeartStrokeWidthInput" value="1.5" min="0.25" max="6" step="0.25" class="config-number-small">px</span>
+                                    <input type="range" id="livesHeartStrokeWidth" min="0.25" max="6" step="0.25" value="1.5">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="config-group effect-group">
+                            <label class="effect-toggle">
+                                <input type="checkbox" id="livesHeartShadow">
+                                <span class="effect-toggle-ui"></span>
+                                <span class="effect-toggle-text">
+                                    <strong>Sombra</strong>
+                                    <small>Sigue la silueta del corazón</small>
+                                </span>
+                            </label>
+                            <div class="stroke-options" id="livesHeartShadowOptions">
+                                <div class="stroke-row">
+                                    <span>Color</span>
+                                    <input type="color" id="livesHeartShadowColor" value="#000000">
+                                </div>
+                                <div class="stroke-row">
+                                    <span>X <input type="number" id="livesHeartShadowXInput" value="1" min="-20" max="20" class="config-number-small">px</span>
+                                    <input type="range" id="livesHeartShadowX" min="-20" max="20" value="1">
+                                </div>
+                                <div class="stroke-row">
+                                    <span>Y <input type="number" id="livesHeartShadowYInput" value="1" min="-20" max="20" class="config-number-small">px</span>
+                                    <input type="range" id="livesHeartShadowY" min="-20" max="20" value="1">
+                                </div>
+                                <div class="stroke-row">
+                                    <span>Difuminado <input type="number" id="livesHeartShadowBlurInput" value="2" min="0" max="30" class="config-number-small">px</span>
+                                    <input type="range" id="livesHeartShadowBlur" min="0" max="30" value="2">
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </details>
 
             <!-- ── Medallas ── -->
-            <details class="config-section">
+            <details class="config-section" data-config-group="nuzlocke" hidden>
                 <summary class="config-section-title">
                     <span class="config-section-label">Medallas</span>
                     <span class="config-section-chevron" aria-hidden="true"></span>
@@ -181,9 +483,9 @@
             </details>
 
             <!-- ── Sprites ── -->
-            <details class="config-section">
+            <details class="config-section" data-config-group="appearance" open hidden>
                 <summary class="config-section-title">
-                    <span class="config-section-label">3 · Sprites</span>
+                    <span class="config-section-label">Sprites</span>
                     <span class="config-section-chevron" aria-hidden="true"></span>
                 </summary>
                 <div class="config-section-body">
@@ -312,13 +614,13 @@
             </details>
 
             <!-- ── Texto ── -->
-            <details class="config-section">
+            <details class="config-section" data-config-group="appearance" hidden>
                 <summary class="config-section-title">
-                    <span class="config-section-label">4 · Texto del overlay</span>
+                    <span class="config-section-label">Nombres</span>
                     <span class="config-section-chevron" aria-hidden="true"></span>
                 </summary>
                 <div class="config-section-body">
-                    <p class="config-section-hint">Solo afecta a nombres y niveles del overlay. Este panel siempre usa Fredoka.</p>
+                    <p class="config-section-hint">Tipografía y efectos del nombre o mote de cada Pokémon.</p>
                     <div class="config-group">
                         <label for="fontFamily">Fuente de los Pokémon</label>
                         <select id="fontFamily" class="config-select">
@@ -398,7 +700,7 @@
                             <span class="effect-toggle-ui"></span>
                             <span class="effect-toggle-text">
                                 <strong>Todo en mayúsculas</strong>
-                                <small>Nombres y niveles en mayúscula</small>
+                                <small>Solo nombres y motes</small>
                             </span>
                         </label>
                     </div>
@@ -414,10 +716,6 @@
                                 <span>Mote</span>
                                 <input type="color" id="colorNickname" value="#fbbf24">
                             </div>
-                            <div class="color-item">
-                                <span>Nivel</span>
-                                <input type="color" id="colorLevel" value="#94a3b8">
-                            </div>
                         </div>
                     </div>
 
@@ -431,22 +729,6 @@
                         </div>
                         <input type="range" id="nameOffsetY" min="-60" max="60" value="0">
                         <span class="obs-hint">Negativo sube el texto; positivo lo baja</span>
-                    </div>
-
-                    <div class="config-group">
-                        <label>Posición del nivel</label>
-                        <div class="level-pos-grid" role="group" aria-label="Posición del nivel">
-                            <button type="button" class="level-pos-btn" data-level-pos="top-left" title="Arriba izquierda">↖</button>
-                            <span class="level-pos-gap" aria-hidden="true"></span>
-                            <button type="button" class="level-pos-btn" data-level-pos="top-right" title="Arriba derecha">↗</button>
-                            <span class="level-pos-gap" aria-hidden="true"></span>
-                            <button type="button" class="level-pos-btn level-pos-center active" data-level-pos="below" title="Debajo del sprite">Debajo</button>
-                            <span class="level-pos-gap" aria-hidden="true"></span>
-                            <button type="button" class="level-pos-btn" data-level-pos="bottom-left" title="Abajo izquierda">↙</button>
-                            <span class="level-pos-gap" aria-hidden="true"></span>
-                            <button type="button" class="level-pos-btn" data-level-pos="bottom-right" title="Abajo derecha">↘</button>
-                        </div>
-                        <span class="obs-hint">Elige una esquina del sprite o debajo del nombre</span>
                     </div>
 
                     <div class="config-group effect-group">
@@ -501,8 +783,258 @@
                 </div>
             </details>
 
+            <!-- ── Nivel ── -->
+            <details class="config-section" data-config-group="appearance" hidden>
+                <summary class="config-section-title">
+                    <span class="config-section-label">Nivel</span>
+                    <span class="config-section-chevron" aria-hidden="true"></span>
+                </summary>
+                <div class="config-section-body">
+                    <p class="config-section-hint">El nivel tiene tipografía, tamaño, color y formato independientes.</p>
+                    <div class="config-group">
+                        <label for="levelFontFamily">Fuente del nivel</label>
+                        <select id="levelFontFamily" class="config-select">
+                            <optgroup id="customFontsGroupLevel" label="── Tus fuentes ──" hidden></optgroup>
+                            <optgroup label="── Recomendadas ──">
+                                <option value="Inter">Inter</option>
+                                <option value="Poppins">Poppins</option>
+                                <option value="Montserrat">Montserrat</option>
+                                <option value="Roboto">Roboto</option>
+                                <option value="Fredoka">Fredoka</option>
+                                <option value="Oswald">Oswald</option>
+                                <option value="Orbitron">Orbitron</option>
+                                <option value="Press Start 2P">Press Start 2P</option>
+                                <option value="VT323">VT323</option>
+                                <option value="Pixelify Sans">Pixelify Sans</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div class="config-group">
+                        <div class="slider-header">
+                            <label for="levelFontSize">Tamaño del nivel</label>
+                            <div class="slider-value">
+                                <input type="number" id="levelFontSizeInput" value="10" min="6" max="64" class="config-number">
+                                <span class="unit">px</span>
+                            </div>
+                        </div>
+                        <input type="range" id="levelFontSize" min="6" max="64" value="10">
+                    </div>
+                    <div class="config-group">
+                        <label for="levelFormat">Formato</label>
+                        <select id="levelFormat" class="config-select">
+                            <option value="short">Nv. 12</option>
+                            <option value="long">Nivel 12</option>
+                            <option value="number">12</option>
+                        </select>
+                    </div>
+                    <div class="config-group">
+                        <label>Posición del nivel</label>
+                        <div class="level-pos-grid" role="group" aria-label="Posición del nivel">
+                            <button type="button" class="level-pos-btn" data-level-pos="top-left" title="Arriba izquierda">↖</button>
+                            <span class="level-pos-gap" aria-hidden="true"></span>
+                            <button type="button" class="level-pos-btn" data-level-pos="top-right" title="Arriba derecha">↗</button>
+                            <button type="button" class="level-pos-btn" data-level-pos="left" title="Centro izquierda">←</button>
+                            <button type="button" class="level-pos-btn level-pos-center active" data-level-pos="below" title="Debajo del sprite">Debajo</button>
+                            <button type="button" class="level-pos-btn" data-level-pos="right" title="Centro derecha">→</button>
+                            <button type="button" class="level-pos-btn" data-level-pos="bottom-left" title="Abajo izquierda">↙</button>
+                            <span class="level-pos-gap" aria-hidden="true"></span>
+                            <button type="button" class="level-pos-btn" data-level-pos="bottom-right" title="Abajo derecha">↘</button>
+                        </div>
+                    </div>
+                    <div class="config-group">
+                        <label>Color del nivel</label>
+                        <div class="color-grid single-color-grid">
+                            <div class="color-item">
+                                <span>Texto</span>
+                                <input type="color" id="colorLevel" value="#94a3b8">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="config-group compact-pair">
+                        <label>Desplazamiento fino</label>
+                        <div class="stroke-row">
+                            <span>X <input type="number" id="levelOffsetXInput" value="0" min="-60" max="60" class="config-number-small">px</span>
+                            <input type="range" id="levelOffsetX" min="-60" max="60" value="0">
+                        </div>
+                        <div class="stroke-row">
+                            <span>Y <input type="number" id="levelOffsetYInput" value="0" min="-60" max="60" class="config-number-small">px</span>
+                            <input type="range" id="levelOffsetY" min="-60" max="60" value="0">
+                        </div>
+                    </div>
+                    <div class="config-group effect-group">
+                        <label class="effect-toggle">
+                            <input type="checkbox" id="levelBackground">
+                            <span class="effect-toggle-ui"></span>
+                            <span class="effect-toggle-text">
+                                <strong>Fondo redondeado</strong>
+                                <small>Fondo independiente para leer mejor el nivel</small>
+                            </span>
+                        </label>
+                        <div class="stroke-options" id="levelBackgroundOptions">
+                            <div class="stroke-row">
+                                <span>Color</span>
+                                <input type="color" id="levelBackgroundColor" value="#111827">
+                            </div>
+                            <div class="stroke-row">
+                                <span>Redondeado <input type="number" id="levelBorderRadiusInput" value="6" min="0" max="40" class="config-number-small">px</span>
+                                <input type="range" id="levelBorderRadius" min="0" max="40" value="6">
+                            </div>
+                            <div class="stroke-row">
+                                <span>Margen interior <input type="number" id="levelPaddingInput" value="3" min="0" max="16" class="config-number-small">px</span>
+                                <input type="range" id="levelPadding" min="0" max="16" value="3">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <!-- ── Objetos ── -->
+            <details class="config-section" data-config-group="appearance" hidden>
+                <summary class="config-section-title">
+                    <span class="config-section-label">Objetos equipados</span>
+                    <span class="config-section-chevron" aria-hidden="true"></span>
+                </summary>
+                <div class="config-section-body">
+                    <p class="config-section-hint">Posición, tamaño y fondo del icono del objeto.</p>
+                    <div class="config-group">
+                        <label for="heldItemPosition">Posición</label>
+                        <select id="heldItemPosition" class="config-select">
+                            <option value="top-left">Arriba izquierda</option>
+                            <option value="top-right">Arriba derecha</option>
+                            <option value="left">Centro izquierda</option>
+                            <option value="right">Centro derecha</option>
+                            <option value="bottom-left">Abajo izquierda</option>
+                            <option value="bottom-right" selected>Abajo derecha</option>
+                        </select>
+                    </div>
+                    <div class="config-group">
+                        <div class="slider-header">
+                            <label for="heldItemSize">Tamaño</label>
+                            <div class="slider-value">
+                                <input type="number" id="heldItemSizeInput" value="22" min="10" max="80" class="config-number">
+                                <span class="unit">px</span>
+                            </div>
+                        </div>
+                        <input type="range" id="heldItemSize" min="10" max="80" value="22">
+                    </div>
+                    <div class="config-group compact-pair">
+                        <label>Desplazamiento fino</label>
+                        <div class="stroke-row">
+                            <span>X <input type="number" id="heldItemOffsetXInput" value="0" min="-60" max="60" class="config-number-small">px</span>
+                            <input type="range" id="heldItemOffsetX" min="-60" max="60" value="0">
+                        </div>
+                        <div class="stroke-row">
+                            <span>Y <input type="number" id="heldItemOffsetYInput" value="0" min="-60" max="60" class="config-number-small">px</span>
+                            <input type="range" id="heldItemOffsetY" min="-60" max="60" value="0">
+                        </div>
+                    </div>
+                    <div class="config-group effect-group">
+                        <label class="effect-toggle">
+                            <input type="checkbox" id="heldItemBackground">
+                            <span class="effect-toggle-ui"></span>
+                            <span class="effect-toggle-text">
+                                <strong>Fondo redondeado</strong>
+                                <small>Mejora el contraste del objeto</small>
+                            </span>
+                        </label>
+                        <div class="stroke-options" id="heldItemBackgroundOptions">
+                            <div class="stroke-row">
+                                <span>Color</span>
+                                <input type="color" id="heldItemBackgroundColor" value="#111827">
+                            </div>
+                            <div class="stroke-row">
+                                <span>Redondeado <input type="number" id="heldItemBorderRadiusInput" value="8" min="0" max="40" class="config-number-small">px</span>
+                                <input type="range" id="heldItemBorderRadius" min="0" max="40" value="8">
+                            </div>
+                            <div class="stroke-row">
+                                <span>Margen interior <input type="number" id="heldItemPaddingInput" value="3" min="0" max="16" class="config-number-small">px</span>
+                                <input type="range" id="heldItemPadding" min="0" max="16" value="3">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <!-- ── Vida del Pokémon ── -->
+            <details class="config-section" data-config-group="appearance" hidden>
+                <summary class="config-section-title">
+                    <span class="config-section-label">Vida (HP)</span>
+                    <span class="config-section-chevron" aria-hidden="true"></span>
+                </summary>
+                <div class="config-section-body">
+                    <p class="config-section-hint">Muestra una barra, el valor actual o una fracción como 12/20.</p>
+                    <div class="config-group">
+                        <label for="hpDisplay">Contenido</label>
+                        <select id="hpDisplay" class="config-select">
+                            <option value="bar">Solo barra</option>
+                            <option value="current">HP actual: 12 HP</option>
+                            <option value="fraction">Fracción: 12/20</option>
+                            <option value="bar-current">Barra + HP actual</option>
+                            <option value="bar-fraction">Barra + 12/20</option>
+                        </select>
+                    </div>
+                    <div class="config-group">
+                        <label for="hpPosition">Posición</label>
+                        <select id="hpPosition" class="config-select">
+                            <option value="below">Debajo del texto</option>
+                            <option value="above">Encima del Pokémon</option>
+                        </select>
+                    </div>
+                    <div class="config-group">
+                        <div class="slider-header">
+                            <label for="hpBarWidth">Ancho</label>
+                            <div class="slider-value">
+                                <input type="number" id="hpBarWidthInput" value="64" min="24" max="240" class="config-number">
+                                <span class="unit">px</span>
+                            </div>
+                        </div>
+                        <input type="range" id="hpBarWidth" min="24" max="240" value="64">
+                    </div>
+                    <div class="config-group">
+                        <div class="slider-header">
+                            <label for="hpBarHeight">Alto de barra</label>
+                            <div class="slider-value">
+                                <input type="number" id="hpBarHeightInput" value="5" min="2" max="30" class="config-number">
+                                <span class="unit">px</span>
+                            </div>
+                        </div>
+                        <input type="range" id="hpBarHeight" min="2" max="30" value="5">
+                    </div>
+                    <div class="config-group">
+                        <div class="slider-header">
+                            <label for="hpFontSize">Tamaño del número</label>
+                            <div class="slider-value">
+                                <input type="number" id="hpFontSizeInput" value="10" min="6" max="48" class="config-number">
+                                <span class="unit">px</span>
+                            </div>
+                        </div>
+                        <input type="range" id="hpFontSize" min="6" max="48" value="10">
+                    </div>
+                    <div class="config-group">
+                        <label>Colores</label>
+                        <div class="color-grid">
+                            <div class="color-item"><span>Alta</span><input type="color" id="hpHighColor" value="#22c55e"></div>
+                            <div class="color-item"><span>Media</span><input type="color" id="hpMediumColor" value="#eab308"></div>
+                            <div class="color-item"><span>Baja</span><input type="color" id="hpLowColor" value="#ef4444"></div>
+                            <div class="color-item"><span>Fondo</span><input type="color" id="hpBackgroundColor" value="#1f2937"></div>
+                            <div class="color-item"><span>Texto</span><input type="color" id="hpTextColor" value="#f8fafc"></div>
+                        </div>
+                    </div>
+                    <div class="config-group">
+                        <div class="slider-header">
+                            <label for="hpBorderRadius">Redondeado</label>
+                            <div class="slider-value">
+                                <input type="number" id="hpBorderRadiusInput" value="3" min="0" max="20" class="config-number">
+                                <span class="unit">px</span>
+                            </div>
+                        </div>
+                        <input type="range" id="hpBorderRadius" min="0" max="20" value="3">
+                    </div>
+                </div>
+            </details>
+
             <!-- ── Animación de muerte ── -->
-            <details class="config-section">
+            <details class="config-section" data-config-group="nuzlocke" hidden>
                 <summary class="config-section-title">
                     <span class="config-section-label">Animación de muerte</span>
                     <span class="config-section-chevron" aria-hidden="true"></span>
@@ -526,7 +1058,7 @@
             </details>
 
             <!-- ── Cementerio ── -->
-            <details class="config-section">
+            <details class="config-section" data-config-group="nuzlocke" hidden>
                 <summary class="config-section-title">
                     <span class="config-section-label">Cementerio (última caja PC)</span>
                     <span class="config-section-chevron" aria-hidden="true"></span>
@@ -642,7 +1174,7 @@
             </details>
 
             <!-- ── OBS ── -->
-            <details class="config-section" open>
+            <details class="config-section" data-config-group="obs" open hidden>
                 <summary class="config-section-title">
                     <span class="config-section-label">OBS</span>
                     <span class="config-section-chevron" aria-hidden="true"></span>
@@ -656,6 +1188,29 @@
                             <button type="button" class="copy-url-btn" id="copyUrlBtn">📋 Copiar</button>
                         </div>
                         <span class="obs-hint">Browser Source para el equipo Pokémon</span>
+                    </div>
+                    <div class="config-group">
+                        <label class="effect-toggle">
+                            <input type="checkbox" id="splitSlots">
+                            <span class="effect-toggle-ui"></span>
+                            <span class="effect-toggle-text">
+                                <strong>URLs por Pokémon</strong>
+                                <small>6 fuentes OBS (slot 1–6) con sprite y nombre</small>
+                            </span>
+                        </label>
+                    </div>
+                    <div class="config-group obs-url-group" id="obsSlotUrlsGroup" hidden>
+                        <label>URLs individuales (slots)</label>
+                        <div class="obs-slot-urls" id="obsSlotUrls"></div>
+                        <span class="obs-hint">Cada Browser Source muestra un solo miembro del equipo según su hueco</span>
+                    </div>
+                    <div class="config-group obs-url-group">
+                        <label for="obsLivesUrl">URL de vidas</label>
+                        <div class="obs-url-container">
+                            <input type="text" id="obsLivesUrl" readonly value="http://localhost:5051/?obs&view=lives">
+                            <button type="button" class="copy-url-btn" id="copyLivesUrlBtn">📋 Copiar</button>
+                        </div>
+                        <span class="obs-hint">Browser Source con el contador de vidas restantes</span>
                     </div>
                     <div class="config-group obs-url-group">
                         <label for="obsBadgesUrl">URL de medallas</label>
@@ -712,6 +1267,11 @@
     <!-- Contenedor del cementerio (última caja del PC) -->
     <div class="cemetery-wrapper" id="cemeteryWrapper" hidden>
         <div class="cemetery-grid" id="cemeteryGrid"></div>
+    </div>
+
+    <!-- Contador de vidas (Nuzlocke) -->
+    <div class="lives-wrapper" id="livesWrapper" hidden>
+        <div class="lives-counter" id="livesCounter"></div>
     </div>
 
     <!-- Contenedor del equipo -->
