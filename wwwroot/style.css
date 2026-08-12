@@ -9,6 +9,15 @@
     --sprite-size: 48px;
     --badge-size: 22px;
     --sprite-fx-pad: 8px;
+    --tcg-card-w: 600;
+    --tcg-card-h: 825;
+    --tcg-crop-t: 100;
+    --tcg-crop-l: 112;
+    --tcg-crop-b: 435;
+    --tcg-crop-r: 54;
+    --tcg-art-w: 434;
+    --tcg-art-h: 290;
+    --tcg-art-cx: 329;
     --font-family: 'Inter', sans-serif;
     --font-size: 11px;
     --name-offset-y: 0px;
@@ -1155,6 +1164,69 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 .pokemon-sprite.high-res {
+    image-rendering: auto;
+}
+
+/* Zoom al cuadro de arte TCG.
+   Defaults: top 100, left 112, bottom 435, right 54 sobre carta 600×825.
+   Ajustable con --tcg-crop-* / --tcg-art-*. */
+.pokemon-sprite-stack.tcg-artwork-stack {
+    overflow: hidden;
+    width: calc(var(--sprite-size) + var(--sprite-fx-pad) * 2);
+    height: calc(var(--sprite-size) * var(--tcg-art-h) / var(--tcg-art-w) + var(--sprite-fx-pad) * 2);
+}
+
+.pokemon-sprite-stack .pokemon-sprite.tcg-artwork {
+    width: calc(var(--sprite-size) * var(--tcg-card-w) / var(--tcg-art-w));
+    height: auto;
+    left: 50%;
+    top: calc(var(--sprite-fx-pad) - var(--sprite-size) * var(--tcg-crop-t) / var(--tcg-art-w));
+    transform: translateX(calc(-1 * var(--tcg-art-cx) / var(--tcg-card-w) * 100%));
+    object-fit: unset;
+    image-rendering: auto;
+}
+
+.cemetery-slot.tcg-artwork-slot {
+    position: relative;
+    overflow: hidden;
+    border-radius: 4px;
+    width: var(--cemetery-sprite-size, 40px);
+    height: calc(var(--cemetery-sprite-size, 40px) * var(--tcg-art-h) / var(--tcg-art-w));
+}
+
+.cemetery-slot .pokemon-sprite.tcg-artwork {
+    position: absolute;
+    width: calc(100% * var(--tcg-card-w) / var(--tcg-art-w));
+    height: auto;
+    left: 50%;
+    top: calc(-100% * var(--tcg-crop-t) / var(--tcg-art-h));
+    transform: translateX(calc(-1 * var(--tcg-art-cx) / var(--tcg-card-w) * 100%));
+    object-fit: unset;
+    image-rendering: auto;
+}
+
+.death-sprite-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.death-sprite-wrap.tcg-artwork-frame {
+    position: relative;
+    width: calc(var(--sprite-size) * 1.35);
+    height: calc(var(--sprite-size) * 1.35 * var(--tcg-art-h) / var(--tcg-art-w));
+    overflow: hidden;
+    border-radius: 6px;
+}
+
+.death-sprite-wrap .pokemon-sprite.tcg-artwork {
+    position: absolute;
+    width: calc(100% * var(--tcg-card-w) / var(--tcg-art-w));
+    height: auto;
+    left: 50%;
+    top: calc(-100% * var(--tcg-crop-t) / var(--tcg-art-h));
+    transform: translateX(calc(-1 * var(--tcg-art-cx) / var(--tcg-card-w) * 100%));
+    object-fit: unset;
     image-rendering: auto;
 }
 

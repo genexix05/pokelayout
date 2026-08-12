@@ -507,6 +507,10 @@
                                 <option value="pmd-portrait">PMD Portrait</option>
                                 <option value="pmd-portrait-happy">PMD Portrait (Happy)</option>
                             </optgroup>
+                            <optgroup label="── TCG ──">
+                                <option value="tcg-card">Carta TCG</option>
+                                <option value="tcg-artwork">Artwork TCG</option>
+                            </optgroup>
                             <optgroup label="── Gen I ──">
                                 <option value="gen1-rb">Rojo / Azul</option>
                                 <option value="gen1-rb-gray">Rojo / Azul (Gris)</option>
@@ -548,6 +552,50 @@
                                 <option value="gen9-sv">Escarlata / Púrpura</option>
                             </optgroup>
                         </select>
+                    </div>
+
+                    <div id="tcgArtCropOptions" hidden>
+                        <p class="config-section-hint">Recorte del artwork (píxeles sobre carta 600×825).</p>
+                        <div class="config-group">
+                            <div class="slider-header">
+                                <label for="tcgArtCropTop">Arriba</label>
+                                <div class="slider-value">
+                                    <input type="number" id="tcgArtCropTopInput" value="100" min="0" max="700" class="config-number">
+                                    <span class="unit">px</span>
+                                </div>
+                            </div>
+                            <input type="range" id="tcgArtCropTop" min="0" max="700" value="100">
+                        </div>
+                        <div class="config-group">
+                            <div class="slider-header">
+                                <label for="tcgArtCropBottom">Abajo</label>
+                                <div class="slider-value">
+                                    <input type="number" id="tcgArtCropBottomInput" value="435" min="0" max="700" class="config-number">
+                                    <span class="unit">px</span>
+                                </div>
+                            </div>
+                            <input type="range" id="tcgArtCropBottom" min="0" max="700" value="435">
+                        </div>
+                        <div class="config-group">
+                            <div class="slider-header">
+                                <label for="tcgArtCropLeft">Izquierda</label>
+                                <div class="slider-value">
+                                    <input type="number" id="tcgArtCropLeftInput" value="112" min="0" max="500" class="config-number">
+                                    <span class="unit">px</span>
+                                </div>
+                            </div>
+                            <input type="range" id="tcgArtCropLeft" min="0" max="500" value="112">
+                        </div>
+                        <div class="config-group">
+                            <div class="slider-header">
+                                <label for="tcgArtCropRight">Derecha</label>
+                                <div class="slider-value">
+                                    <input type="number" id="tcgArtCropRightInput" value="54" min="0" max="500" class="config-number">
+                                    <span class="unit">px</span>
+                                </div>
+                            </div>
+                            <input type="range" id="tcgArtCropRight" min="0" max="500" value="54">
+                        </div>
                     </div>
 
                     <div class="config-group">
@@ -1089,6 +1137,10 @@
                             <optgroup label="── PMD Collab ──">
                                 <option value="pmd-portrait">Portrait Normal</option>
                                 <option value="pmd-portrait-happy">Portrait Happy</option>
+                            </optgroup>
+                            <optgroup label="── TCG ──">
+                                <option value="tcg-card">Carta TCG</option>
+                                <option value="tcg-artwork">Artwork TCG</option>
                             </optgroup>
                             <optgroup label="── Gen I ──">
                                 <option value="gen1-rb">Rojo / Azul</option>

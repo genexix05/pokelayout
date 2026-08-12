@@ -112,7 +112,12 @@ let config = {
     spriteStroke: false,
     spriteStrokeColor: '#000000',
     spriteStrokeWidth: 2,
-    background: 'transparent'
+    background: 'transparent',
+    // Recorte Artwork TCG (píxeles sobre carta high 600×825)
+    tcgArtCropTop: 100,
+    tcgArtCropLeft: 112,
+    tcgArtCropBottom: 435,
+    tcgArtCropRight: 54
 };
 
 const SPRITE_BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon';
@@ -165,6 +170,10 @@ const SPRITE_TYPES = {
     'pmd-portrait':       { source: 'pmd', emotion: 'Normal', shiny: true, female: true, highRes: false },
     'pmd-portrait-happy': { source: 'pmd', emotion: 'Happy', shiny: true, female: true, highRes: false },
 
+    // Pokémon TCG (TCGdex assets)
+    'tcg-card':           { source: 'tcgdex', quality: 'high', ext: 'webp', highRes: true },
+    'tcg-artwork':        { source: 'tcgdex', quality: 'high', ext: 'webp', highRes: true, artworkCrop: true },
+
     // Carpeta custom-sprites/<pack>/Front (PNG en hoja de sprites)
     'custom':             { source: 'custom', ext: 'png', shiny: false, female: false, highRes: false }
 };
@@ -196,6 +205,11 @@ function normalizeCustomSpriteType(typeKey, pack) {
 const PMD_CDN = 'https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master';
 const PMD_GRAPHQL = 'https://spriteserver.pmdcollab.org/graphql';
 const pmdUrlCache = new Map();
+
+const TCGDEX_API = 'https://api.tcgdex.net/v2/en';
+const tcgdexUrlCache = new Map();
+const TCGDEX_CARD_W = 600;
+const TCGDEX_CARD_H = 825;
 
 function isOBSMode() {
     return new URLSearchParams(window.location.search).has('obs');
@@ -388,6 +402,7 @@ function generateOBSUrl() {
     params.set('sstroke', config.spriteStroke ? '1' : '0');
     params.set('sstrokec', config.spriteStrokeColor.replace('#', ''));
     params.set('sstrokew', config.spriteStrokeWidth);
+    appendTcgArtCropParams(params);
     return window.location.origin + '/?obs&' + params.toString();
 }
 
@@ -463,6 +478,7 @@ function generateDeathOBSUrl() {
     params.set('sstroke', config.spriteStroke ? '1' : '0');
     params.set('sstrokec', config.spriteStrokeColor.replace('#', ''));
     params.set('sstrokew', config.spriteStrokeWidth);
+    appendTcgArtCropParams(params);
     return window.location.origin + '/?obs&' + params.toString();
 }
 
@@ -474,6 +490,7 @@ function generateCemeteryOBSUrl() {
     params.set('cols', config.cemeteryColumns);
     params.set('gray', config.cemeteryGrayscale ? '1' : '0');
     params.set('bg', config.background);
+    appendTcgArtCropParams(params);
     return window.location.origin + '/?obs&' + params.toString();
 }
 
@@ -666,6 +683,22 @@ function loadConfigFromURL() {
     if (p.has('sstroke')) config.spriteStroke = p.get('sstroke') === '1';
     if (p.has('sstrokec')) config.spriteStrokeColor = '#' + p.get('sstrokec');
     if (p.has('sstrokew')) config.spriteStrokeWidth = parseFloat(p.get('sstrokew')) || 2;
+    if (p.has('tcgartt')) {
+        const n = parseInt(p.get('tcgartt'), 10);
+        if (Number.isFinite(n) && n >= 0) config.tcgArtCropTop = n;
+    }
+    if (p.has('tcgartl')) {
+        const n = parseInt(p.get('tcgartl'), 10);
+        if (Number.isFinite(n) && n >= 0) config.tcgArtCropLeft = n;
+    }
+    if (p.has('tcgartb')) {
+        const n = parseInt(p.get('tcgartb'), 10);
+        if (Number.isFinite(n) && n >= 0) config.tcgArtCropBottom = n;
+    }
+    if (p.has('tcgartr')) {
+        const n = parseInt(p.get('tcgartr'), 10);
+        if (Number.isFinite(n) && n >= 0) config.tcgArtCropRight = n;
+    }
 }
 
 function loadConfig() {
@@ -947,6 +980,48 @@ function getSpriteFxPadding() {
     return Math.ceil(pad);
 }
 
+/** Recorte Artwork TCG en píxeles sobre carta 600×825. */
+function getTcgArtCrop() {
+    let t = Math.max(0, Math.round(Number(config.tcgArtCropTop) || 0));
+    let l = Math.max(0, Math.round(Number(config.tcgArtCropLeft) || 0));
+    let b = Math.max(0, Math.round(Number(config.tcgArtCropBottom) || 0));
+    let r = Math.max(0, Math.round(Number(config.tcgArtCropRight) || 0));
+    if (l >= TCGDEX_CARD_W - 1) l = TCGDEX_CARD_W - 2;
+    if (r >= TCGDEX_CARD_W - l) r = Math.max(0, TCGDEX_CARD_W - l - 1);
+    if (t >= TCGDEX_CARD_H - 1) t = TCGDEX_CARD_H - 2;
+    if (b >= TCGDEX_CARD_H - t) b = Math.max(0, TCGDEX_CARD_H - t - 1);
+    const w = TCGDEX_CARD_W - l - r;
+    const h = TCGDEX_CARD_H - t - b;
+    return { t, l, b, r, w, h, cx: l + w / 2 };
+}
+
+function appendTcgArtCropParams(params) {
+    const crop = getTcgArtCrop();
+    params.set('tcgartt', crop.t);
+    params.set('tcgartl', crop.l);
+    params.set('tcgartb', crop.b);
+    params.set('tcgartr', crop.r);
+}
+
+function applyTcgArtCropVars(root = document.documentElement) {
+    const crop = getTcgArtCrop();
+    root.style.setProperty('--tcg-card-w', String(TCGDEX_CARD_W));
+    root.style.setProperty('--tcg-card-h', String(TCGDEX_CARD_H));
+    root.style.setProperty('--tcg-crop-t', String(crop.t));
+    root.style.setProperty('--tcg-crop-l', String(crop.l));
+    root.style.setProperty('--tcg-crop-b', String(crop.b));
+    root.style.setProperty('--tcg-crop-r', String(crop.r));
+    root.style.setProperty('--tcg-art-w', String(crop.w));
+    root.style.setProperty('--tcg-art-h', String(crop.h));
+    root.style.setProperty('--tcg-art-cx', String(crop.cx));
+}
+
+function updateTcgArtCropVisibility() {
+    const panel = document.getElementById('tcgArtCropOptions');
+    if (!panel) return;
+    panel.hidden = !(config.spriteType === 'tcg-artwork' || config.cemeterySpriteType === 'tcg-artwork');
+}
+
 function applyConfig() {
     const root = document.documentElement;
     const container = document.getElementById('team');
@@ -1008,6 +1083,7 @@ function applyConfig() {
     root.style.setProperty('--lives-heart-stroke-color', config.livesHeartStrokeColor || '#000000');
     root.style.setProperty('--lives-heart-stroke-width', (config.livesHeartStrokeWidth || 1.5) + 'px');
     root.style.setProperty('--lives-heart-shadow', buildLivesHeartShadow());
+    applyTcgArtCropVars(root);
     updateSpriteSvgFilter();
     
     if (isCustomSpriteType(config.spriteType) && currentTeam?.team?.length) {
@@ -1134,6 +1210,11 @@ function applyConfig() {
         if (el('spriteSize')) el('spriteSize').value = config.spriteSize;
         if (el('spriteSizeInput')) el('spriteSizeInput').value = config.spriteSize;
         if (el('spriteType')) el('spriteType').value = config.spriteType;
+        for (const key of ['tcgArtCropTop', 'tcgArtCropLeft', 'tcgArtCropBottom', 'tcgArtCropRight']) {
+            if (el(key)) el(key).value = config[key];
+            if (el(key + 'Input')) el(key + 'Input').value = config[key];
+        }
+        updateTcgArtCropVisibility();
         if (el('fontFamily')) el('fontFamily').value = config.fontFamily;
         if (el('fontSize')) el('fontSize').value = config.fontSize;
         if (el('fontSizeInput')) el('fontSizeInput').value = config.fontSize;
@@ -1499,9 +1580,16 @@ function setupConfigListeners() {
             config.cemeterySpriteType = e.target.value;
             saveConfig();
             applyConfig();
-            if (getSpriteTypeEntry(config.cemeterySpriteType).source === 'pmd' && currentTeam?.cemetery?.length) {
+            updateTcgArtCropVisibility();
+            const cemeteryType = getSpriteTypeEntry(config.cemeterySpriteType);
+            if (cemeteryType.source === 'pmd' && currentTeam?.cemetery?.length) {
                 await withSpriteTypeAsync(config.cemeterySpriteType, async () => {
                     await resolvePmdPortraits(currentTeam.cemetery);
+                });
+                renderCemetery(currentTeam);
+            } else if (cemeteryType.source === 'tcgdex' && currentTeam?.cemetery?.length) {
+                await withSpriteTypeAsync(config.cemeterySpriteType, async () => {
+                    await resolveTcgdexCards(currentTeam.cemetery);
                 });
                 renderCemetery(currentTeam);
             }
@@ -1593,8 +1681,13 @@ function setupConfigListeners() {
         }
         saveConfig();
         applyConfig();
-        if (getSpriteTypeEntry(config.spriteType).source === 'pmd' && currentTeam?.team?.length) {
+        updateTcgArtCropVisibility();
+        const selectedType = getSpriteTypeEntry(config.spriteType);
+        if (selectedType.source === 'pmd' && currentTeam?.team?.length) {
             await resolvePmdPortraits(currentTeam.team);
+            renderTeam(currentTeam);
+        } else if (selectedType.source === 'tcgdex' && currentTeam?.team?.length) {
+            await resolveTcgdexCards(currentTeam.team);
             renderTeam(currentTeam);
         } else if (isCustomSpriteType(config.spriteType) && currentTeam?.team?.length) {
             renderTeam(currentTeam);
@@ -1629,6 +1722,10 @@ function setupConfigListeners() {
     setupRangeInput('gridRowGap', 'gridRowGapInput', 'gridRowGap');
     setupRangeInput('gridColGap', 'gridColGapInput', 'gridColGap');
     setupRangeInput('spriteSize', 'spriteSizeInput', 'spriteSize');
+    setupRangeInput('tcgArtCropTop', 'tcgArtCropTopInput', 'tcgArtCropTop');
+    setupRangeInput('tcgArtCropLeft', 'tcgArtCropLeftInput', 'tcgArtCropLeft');
+    setupRangeInput('tcgArtCropBottom', 'tcgArtCropBottomInput', 'tcgArtCropBottom');
+    setupRangeInput('tcgArtCropRight', 'tcgArtCropRightInput', 'tcgArtCropRight');
     setupRangeInput('fontSize', 'fontSizeInput', 'fontSize');
 
     bindCheckbox('textUppercase', 'textUppercase');
@@ -2085,6 +2182,15 @@ function getSpriteUrl(pokemon) {
         return buildPmdPortraitUrl(id, form, shiny, female, type.emotion || 'Normal');
     }
 
+    if (type.source === 'tcgdex') {
+        const name = pokemon.speciesName || '';
+        if (name && tcgdexUrlCache.has(name)) {
+            const cached = tcgdexUrlCache.get(name);
+            if (cached) return cached;
+        }
+        return buildSpriteUrl('default', id, shiny, false);
+    }
+
     return buildSpriteUrl(config.spriteType, id, shiny, female);
 }
 
@@ -2138,6 +2244,48 @@ async function resolvePmdPortraits(team) {
     }
 }
 
+function buildTcgdexAssetUrl(imageBase, quality = 'high', ext = 'webp') {
+    if (!imageBase) return '';
+    const base = String(imageBase).replace(/\/$/, '');
+    return `${base}/${quality}.${ext}`;
+}
+
+function isTcgArtworkCrop(type) {
+    return !!(type && type.source === 'tcgdex' && type.artworkCrop);
+}
+
+/** Busca cartas TCG por nombre de especie y rellena caché de URLs de assets. */
+async function resolveTcgdexCards(team) {
+    const type = getSpriteTypeEntry(config.spriteType);
+    if (!type || type.source !== 'tcgdex' || !team?.length) return;
+
+    const quality = type.quality || 'high';
+    const ext = type.ext || 'webp';
+    const names = [...new Set(team.map(p => p.speciesName).filter(Boolean))];
+    const pending = names.filter(name => !tcgdexUrlCache.has(name));
+    if (!pending.length) return;
+
+    await Promise.all(pending.map(async name => {
+        try {
+            const url = `${TCGDEX_API}/cards?name=${encodeURIComponent(`eq:${name}`)}&category=${encodeURIComponent('eq:Pokemon')}`;
+            const res = await fetch(url);
+            if (!res.ok) {
+                tcgdexUrlCache.set(name, '');
+                return;
+            }
+            const cards = await res.json();
+            const withImage = Array.isArray(cards) ? cards.filter(c => c.image) : [];
+            const card = withImage.length
+                ? withImage[Math.floor(Math.random() * withImage.length)]
+                : null;
+            tcgdexUrlCache.set(name, card ? buildTcgdexAssetUrl(card.image, quality, ext) : '');
+        } catch (e) {
+            console.warn('[TCGdex] búsqueda falló', name, e);
+            tcgdexUrlCache.set(name, '');
+        }
+    }));
+}
+
 async function fetchTeamData() {
     try {
         const r = await fetch(API_URL);
@@ -2180,7 +2328,12 @@ function createPokemonCard(pokemon) {
     const hasNickname = pokemon.hasNickname && pokemon.nickname;
     const spriteType = getSpriteTypeEntry(config.spriteType);
     const isHighRes = !!spriteType.highRes;
-    let spriteClass = 'pokemon-sprite' + (isHighRes ? ' high-res' : '') + (isShiny && config.showShiny ? ' shiny' : '') + (isFainted ? ' fainted' : '');
+    const artCrop = isTcgArtworkCrop(spriteType);
+    let spriteClass = 'pokemon-sprite'
+        + (isHighRes ? ' high-res' : '')
+        + (artCrop ? ' tcg-artwork' : '')
+        + (isShiny && config.showShiny ? ' shiny' : '')
+        + (isFainted ? ' fainted' : '');
     const spriteFilter = buildSpriteFilter(isShiny, isFainted);
     
     let nameClass = 'pokemon-name' + (hasNickname ? ' nickname' : '') + (config.textStroke ? ' has-stroke' : '');
@@ -2202,6 +2355,8 @@ function createPokemonCard(pokemon) {
     if (isCustom) {
         const customUrls = buildCustomSpriteUrls(pokemon);
         fallbackUrl = customUrls[1] || buildSpriteUrl('default', pokemon.species, shiny, false);
+    } else if (type.source === 'tcgdex') {
+        fallbackUrl = buildSpriteUrl('default', pokemon.species, shiny, false);
     } else if (type.source === 'pmd') {
         if (pokemon.gender === 1) {
             fallbackUrl = buildPmdPortraitUrl(pokemon.species, form, shiny, false, type.emotion || 'Normal');
@@ -2227,7 +2382,7 @@ function createPokemonCard(pokemon) {
     const onErr = isCustom
         ? buildChainedImgErrorHandler([...buildCustomSpriteUrls(pokemon).slice(1), fallback2, FALLBACK_SPRITE])
         : buildImgErrorHandler(fallbackUrl, fallback2);
-    html += `<div class="pokemon-sprite-stack">`;
+    html += `<div class="pokemon-sprite-stack${artCrop ? ' tcg-artwork-stack' : ''}">`;
     if (isCustom) {
         if (config.spriteShadow) {
             html += buildCustomSpriteImgHtml(
@@ -2247,7 +2402,7 @@ function createPokemonCard(pokemon) {
     } else {
         // Capa de sombra: mismo GIF/PNG duplicado → la sombra sigue la silueta (no el rectángulo del <img>)
         if (config.spriteShadow) {
-            html += `<img src="${primaryUrl}" alt="" class="pokemon-sprite sprite-shadow-layer${isHighRes ? ' high-res' : ''}${isFainted ? ' fainted' : ''}" style="filter:url(#spriteShadowFilter)" aria-hidden="true" draggable="false" onerror="${onErr}">`;
+            html += `<img src="${primaryUrl}" alt="" class="pokemon-sprite sprite-shadow-layer${isHighRes ? ' high-res' : ''}${artCrop ? ' tcg-artwork' : ''}${isFainted ? ' fainted' : ''}" style="filter:url(#spriteShadowFilter)" aria-hidden="true" draggable="false" onerror="${onErr}">`;
         }
         html += `<img src="${primaryUrl}" alt="${escapeHtml(pokemon.speciesName)}" class="${spriteClass}" style="filter:${spriteFilter}" data-fb2="${fallback2}" onerror="${onErr}">`;
     }
@@ -2385,8 +2540,12 @@ function renderLives(data) {
 function createCemeterySprite(pokemon) {
     const spriteType = getSpriteTypeEntry(config.spriteType);
     const isHighRes = !!spriteType.highRes;
+    const artCrop = isTcgArtworkCrop(spriteType);
     const gray = !!config.cemeteryGrayscale;
-    let spriteClass = 'pokemon-sprite cemetery-sprite' + (isHighRes ? ' high-res' : '') + (gray ? ' fainted' : '');
+    let spriteClass = 'pokemon-sprite cemetery-sprite'
+        + (isHighRes ? ' high-res' : '')
+        + (artCrop ? ' tcg-artwork' : '')
+        + (gray ? ' fainted' : '');
     const spriteFilter = gray ? 'grayscale(100%)' : 'none';
 
     const primaryUrl = getSpriteUrl(pokemon);
@@ -2400,6 +2559,8 @@ function createCemeterySprite(pokemon) {
     if (isCustom) {
         const customUrls = buildCustomSpriteUrls(pokemon);
         fallbackUrl = customUrls[1] || buildSpriteUrl('default', pokemon.species, shiny, false);
+    } else if (type.source === 'tcgdex') {
+        fallbackUrl = buildSpriteUrl('default', pokemon.species, shiny, false);
     } else if (type.source === 'pmd') {
         if (pokemon.gender === 1) {
             fallbackUrl = buildPmdPortraitUrl(pokemon.species, form, shiny, false, type.emotion || 'Normal');
@@ -2420,8 +2581,10 @@ function createCemeterySprite(pokemon) {
         ? buildChainedImgErrorHandler([...buildCustomSpriteUrls(pokemon).slice(1), fallback2, FALLBACK_SPRITE])
         : buildImgErrorHandler(fallbackUrl, fallback2);
 
+    const slotClass = 'cemetery-slot' + (artCrop ? ' tcg-artwork-slot' : '');
+
     if (isCustom) {
-        return `<div class="cemetery-slot">${buildCustomSpriteImgHtml(
+        return `<div class="${slotClass}">${buildCustomSpriteImgHtml(
             primaryUrl,
             spriteClass,
             spriteFilter,
@@ -2430,7 +2593,7 @@ function createCemeterySprite(pokemon) {
         )}</div>`;
     }
 
-    return `<div class="cemetery-slot">`
+    return `<div class="${slotClass}">`
         + `<img src="${primaryUrl}" alt="${escapeHtml(pokemon.speciesName)}" class="${spriteClass}" style="filter:${spriteFilter}" data-fb2="${fallback2}" onerror="${onErr}">`
         + `</div>`;
 }
@@ -2551,6 +2714,7 @@ function buildDeathCardHtml(pokemon) {
     const displayName = getDeathDisplayName(pokemon);
     const spriteType = getSpriteTypeEntry(config.spriteType);
     const isHighRes = !!spriteType.highRes;
+    const artCrop = isTcgArtworkCrop(spriteType);
     const primaryUrl = getSpriteUrl(pokemon);
     const typeKey = isCustomSpriteType(config.spriteType) ? 'default' : config.spriteType;
     const type = spriteType;
@@ -2562,6 +2726,8 @@ function buildDeathCardHtml(pokemon) {
     if (isCustom) {
         const customUrls = buildCustomSpriteUrls(pokemon);
         fallbackUrl = customUrls[1] || buildSpriteUrl('default', pokemon.species, shiny, false);
+    } else if (type.source === 'tcgdex') {
+        fallbackUrl = buildSpriteUrl('default', pokemon.species, shiny, false);
     } else if (type.source === 'pmd') {
         if (pokemon.gender === 1) {
             fallbackUrl = buildPmdPortraitUrl(pokemon.species, form, shiny, false, type.emotion || 'Normal');
@@ -2587,8 +2753,13 @@ function buildDeathCardHtml(pokemon) {
     if (isCustom) {
         spriteHtml = buildCustomSpriteImgHtml(primaryUrl, 'pokemon-sprite fainted', grayFilter, onErr, pokemon.speciesName);
     } else {
-        const cls = 'pokemon-sprite fainted' + (isHighRes ? ' high-res' : '');
-        spriteHtml = `<img src="${primaryUrl}" alt="${escapeHtml(pokemon.speciesName)}" class="${cls}" style="filter:${grayFilter}" data-fb2="${fallback2}" onerror="${onErr}">`;
+        const cls = 'pokemon-sprite fainted'
+            + (isHighRes ? ' high-res' : '')
+            + (artCrop ? ' tcg-artwork' : '');
+        const wrapClass = artCrop ? ' death-sprite-wrap tcg-artwork-frame' : 'death-sprite-wrap';
+        spriteHtml = `<div class="${wrapClass}">`
+            + `<img src="${primaryUrl}" alt="${escapeHtml(pokemon.speciesName)}" class="${cls}" style="filter:${grayFilter}" data-fb2="${fallback2}" onerror="${onErr}">`
+            + `</div>`;
     }
 
     return `<div class="death-card" data-key="${escapeHtml(pokemonIdentityKey(pokemon))}">`
@@ -2651,15 +2822,24 @@ async function updateOverlay() {
         const type = getSpriteTypeEntry(config.spriteType);
         if (type.source === 'pmd' && t?.team?.length) {
             await resolvePmdPortraits(t.team);
+        } else if (type.source === 'tcgdex' && t?.team?.length) {
+            await resolveTcgdexCards(t.team);
         }
         renderTeam(t);
     }
     renderBadges(t);
 
-    if (shouldShowCemetery() && getSpriteTypeEntry(config.cemeterySpriteType).source === 'pmd' && t?.cemetery?.length) {
-        await withSpriteTypeAsync(config.cemeterySpriteType, async () => {
-            await resolvePmdPortraits(t.cemetery);
-        });
+    if (shouldShowCemetery() && t?.cemetery?.length) {
+        const cemeteryType = getSpriteTypeEntry(config.cemeterySpriteType);
+        if (cemeteryType.source === 'pmd') {
+            await withSpriteTypeAsync(config.cemeterySpriteType, async () => {
+                await resolvePmdPortraits(t.cemetery);
+            });
+        } else if (cemeteryType.source === 'tcgdex') {
+            await withSpriteTypeAsync(config.cemeterySpriteType, async () => {
+                await resolveTcgdexCards(t.cemetery);
+            });
+        }
     }
     renderCemetery(t);
     renderLives(t);
