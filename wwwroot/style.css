@@ -1096,11 +1096,14 @@ input[type="range"]::-webkit-slider-thumb {
     overflow: visible;
 }
 
-/* Caja más grande que el sprite: deja aire para contorno y sombra */
+/* Caja más grande que el sprite: deja aire para contorno y sombra.
+   El margen negativo cancela ese aire en el layout para que X/Y/blur
+   no cambien la distancia entre sprites ni el hueco con el nombre. */
 .pokemon-sprite-stack {
     position: relative;
     width: calc(var(--sprite-size) + var(--sprite-fx-pad) * 2);
     height: calc(var(--sprite-size) + var(--sprite-fx-pad) * 2);
+    margin: calc(-1 * var(--sprite-fx-pad));
     flex-shrink: 0;
     overflow: visible;
 }
@@ -1136,6 +1139,47 @@ input[type="range"]::-webkit-slider-thumb {
 .pokemon-sprite-stack .sprite-sheet-wrap.sprite-shadow-layer {
     z-index: 0;
     pointer-events: none;
+}
+
+/* Botón para rerollear variante Custom/ (solo panel de preview) */
+.custom-sprite-reroll {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    z-index: 5;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 6px;
+    background: rgba(15, 23, 42, 0.72);
+    color: #f8fafc;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.55;
+    transition: opacity 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.pokemon-card:hover .custom-sprite-reroll,
+.custom-sprite-reroll:focus-visible {
+    opacity: 1;
+}
+
+.custom-sprite-reroll:hover {
+    background: rgba(30, 41, 59, 0.92);
+    transform: rotate(-20deg);
+}
+
+.custom-sprite-reroll:active {
+    transform: rotate(-90deg);
+}
+
+body.obs-mode .custom-sprite-reroll {
+    display: none !important;
 }
 
 .sprite-sheet-wrap .sprite-sheet-frame {
@@ -1174,6 +1218,7 @@ input[type="range"]::-webkit-slider-thumb {
     overflow: hidden;
     width: calc(var(--sprite-size) + var(--sprite-fx-pad) * 2);
     height: calc(var(--sprite-size) * var(--tcg-art-h) / var(--tcg-art-w) + var(--sprite-fx-pad) * 2);
+    margin: calc(-1 * var(--sprite-fx-pad));
 }
 
 .pokemon-sprite-stack .pokemon-sprite.tcg-artwork {

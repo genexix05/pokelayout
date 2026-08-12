@@ -528,6 +528,37 @@ public class MainForm : Form
                 return;
             }
 
+            // Índice de variantes Custom/ (dex + sufijo): ?pack=Gen%20V%20(Custom%20Estatico)
+            if (path.Equals("/api/custom-sprites/custom-index", StringComparison.OrdinalIgnoreCase) &&
+                request.HttpMethod == "GET")
+            {
+                var packId = request.QueryString["pack"];
+                if (string.IsNullOrWhiteSpace(packId))
+                {
+                    response.StatusCode = 400;
+                    buffer = Encoding.UTF8.GetBytes("Missing pack");
+                    response.ContentLength64 = buffer.Length;
+                    await response.OutputStream.WriteAsync(buffer);
+                    return;
+                }
+
+                var index = GetCustomDexIndex(packId);
+                if (index == null)
+                {
+                    response.StatusCode = 404;
+                    buffer = Encoding.UTF8.GetBytes("Pack or Custom folder not found");
+                    response.ContentLength64 = buffer.Length;
+                    await response.OutputStream.WriteAsync(buffer);
+                    return;
+                }
+
+                response.ContentType = "application/json; charset=utf-8";
+                buffer = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(index));
+                response.ContentLength64 = buffer.Length;
+                await response.OutputStream.WriteAsync(buffer);
+                return;
+            }
+
             if (path.Equals("/api/fonts", StringComparison.OrdinalIgnoreCase))
             {
                 if (request.HttpMethod == "GET")
@@ -636,7 +667,17 @@ public class MainForm : Form
         public string Id { get; set; } = "";
         public List<string> Folders { get; set; } = new();
         public bool HasFormsFile { get; set; }
+        public bool HasCustomFolder { get; set; }
     }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Dictionary<string, List<string>>> CustomDexIndexCache =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Nombres de forma en Custom/ (más largos primero al emparejar).</summary>
+    private static readonly string[] CustomDexFormNames =
+    [
+        "pirouette", "midnight", "pompom", "sensu", "sunny", "rainy", "snowy", "ultra", "core", "pau"
+    ];
 
     private static List<CustomSpritePackInfo> ListCustomSpritePacks()
     {
@@ -658,12 +699,93 @@ public class MainForm : Form
                 {
                     Id = id,
                     Folders = folders,
-                    HasFormsFile = File.Exists(Path.Combine(packDir, "pokemon_forms.txt"))
+                    HasFormsFile = File.Exists(Path.Combine(packDir, "pokemon_forms.txt")),
+                    HasCustomFolder = folders.Any(f => f.Equals("Custom", StringComparison.OrdinalIgnoreCase))
                 };
             })
             .Where(p => p.Folders.Count > 0)
             .OrderBy(p => p.Id, StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    /// <summary>
+    /// Clave de grupo para Custom/: "25", "648_pirouette", etc.
+    /// </summary>
+    private static string? GetCustomDexGroupKey(string baseName)
+    {
+        if (string.IsNullOrWhiteSpace(baseName)) return null;
+        baseName = baseName.Trim().ToLowerInvariant();
+
+        var i = 0;
+        while (i < baseName.Length && char.IsDigit(baseName[i])) i++;
+        if (i == 0) return null;
+
+        var dex = baseName[..i];
+        var rest = baseName[i..];
+
+        // 25 / 25a / 25aa → grupo "25"
+        if (rest.Length == 0 || rest.All(char.IsLetter))
+            return dex;
+
+        // 351_sunny / 351_sunnya → grupo "351_sunny"
+        if (rest[0] != '_') return null;
+        var after = rest[1..];
+        foreach (var form in CustomDexFormNames.OrderByDescending(f => f.Length))
+        {
+            if (after.Equals(form, StringComparison.Ordinal) ||
+                (after.StartsWith(form, StringComparison.Ordinal) && after[form.Length..].All(char.IsLetter)))
+            {
+                return $"{dex}_{form}";
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Agrupa archivos de custom-sprites/&lt;pack&gt;/Custom/ por clave de dex/forma
+    /// (p.ej. "25" → ["25","25a","25b"], "648_pirouette" → ["648_pirouette","648_pirouettea"]).
+    /// </summary>
+    private static Dictionary<string, List<string>>? GetCustomDexIndex(string packId)
+    {
+        packId = Path.GetFileName(packId.Trim());
+        if (string.IsNullOrWhiteSpace(packId))
+            return null;
+
+        if (CustomDexIndexCache.TryGetValue(packId, out var cached))
+            return cached;
+
+        var root = Path.GetFullPath(GetCustomSpritesDirectory());
+        var packDir = Path.GetFullPath(Path.Combine(root, packId));
+        if (!packDir.StartsWith(root, StringComparison.OrdinalIgnoreCase) || !Directory.Exists(packDir))
+            return null;
+
+        var customDir = Directory.GetDirectories(packDir)
+            .FirstOrDefault(d => Path.GetFileName(d).Equals("Custom", StringComparison.OrdinalIgnoreCase));
+        if (customDir == null)
+            return null;
+
+        var index = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var file in Directory.EnumerateFiles(customDir))
+        {
+            if (!AllowedSpriteExtensions.Contains(Path.GetExtension(file))) continue;
+            var baseName = Path.GetFileNameWithoutExtension(file);
+            var group = GetCustomDexGroupKey(baseName);
+            if (group == null) continue;
+
+            if (!index.TryGetValue(group, out var list))
+            {
+                list = [];
+                index[group] = list;
+            }
+            list.Add(baseName!);
+        }
+
+        foreach (var list in index.Values)
+            list.Sort(StringComparer.OrdinalIgnoreCase);
+
+        CustomDexIndexCache[packId] = index;
+        return index;
     }
 
     private static string? FindFileCaseInsensitive(string dir, string fileName)

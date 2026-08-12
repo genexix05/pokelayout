@@ -7,7 +7,11 @@ const API_URL = '/api/team';
 
 let currentTeam = null;
 let customFonts = []; // { family, fileName }
-let customSpritePacks = []; // { id, folders, hasFormsFile }
+let customSpritePacks = []; // { id, folders, hasFormsFile, hasCustomFolder }
+/** Índice Custom/: packId → { "25": ["25","25a",...], "648_pirouette": [...] } */
+const customDexIndexByPack = new Map();
+/** Elección aleatoria de la sesión: `${pack}|${groupKey}` → basename */
+const customDexChoiceCache = new Map();
 let deathAnimTimer = null;
 let deathAnimHideTimer = null;
 const DEATH_ANIM_HOLD_MS = 4500;
@@ -967,7 +971,10 @@ function buildCustomSpriteImgHtml(url, className, filterStyle, onErr, alt = '') 
 }
 
 function getSpriteFxPadding() {
-    let pad = 4; // margen mínimo para que el sprite no toque el borde del box
+    // Solo reserva aire visual para que contorno/sombra no se recorten.
+    // El CSS usa margen negativo igual a este pad, así el layout
+    // (distancia entre sprites / nombre) sigue siendo --sprite-size.
+    let pad = 4;
     if (config.spriteStroke) {
         pad = Math.max(pad, (Number(config.spriteStrokeWidth) || 0) + 2);
     }
@@ -1592,6 +1599,9 @@ function setupConfigListeners() {
                     await resolveTcgdexCards(currentTeam.cemetery);
                 });
                 renderCemetery(currentTeam);
+            } else if (isCustomDexSpritePack(config.cemeterySpriteType) && currentTeam?.cemetery?.length) {
+                await ensureCustomDexIndexForType(config.cemeterySpriteType);
+                renderCemetery(currentTeam);
             }
         });
     }
@@ -1690,6 +1700,7 @@ function setupConfigListeners() {
             await resolveTcgdexCards(currentTeam.team);
             renderTeam(currentTeam);
         } else if (isCustomSpriteType(config.spriteType) && currentTeam?.team?.length) {
+            await ensureCustomDexIndexForType(config.spriteType);
             renderTeam(currentTeam);
         }
     });
@@ -2130,20 +2141,141 @@ function buildCustomSpriteVariants(pokemon) {
     return [base];
 }
 
-function buildCustomSpritePath(variantName, folder) {
-    const pack = getCustomSpritePack(config.spriteType);
+function buildCustomSpritePath(variantName, folder, packId = null) {
+    const pack = packId || getCustomSpritePack(config.spriteType);
     return '/sprites/' + [pack, folder, `${variantName}.png`].map(encodeURIComponent).join('/');
 }
 
-/** Prioridad: shiny → normal; forma+fembra → forma → hembra → base */
+/** Packs con carpeta Custom/ (dex + sufijos a/b/c…), p.ej. Gen V (Custom Estatico). */
+function packHasCustomDexFolder(packId) {
+    const pack = customSpritePacks.find(p => p.id === packId);
+    if (!pack) return false;
+    if (pack.hasCustomFolder) return true;
+    return (pack.folders || []).some(f => String(f).toLowerCase() === 'custom');
+}
+
+function isCustomDexSpritePack(typeKey = config.spriteType) {
+    return isCustomSpriteType(typeKey) && packHasCustomDexFolder(getCustomSpritePack(typeKey));
+}
+
+/**
+ * Sufijos de forma en Custom/ para especies que no usan solo el nº de dex.
+ * Clave = form id del save → sufijo de archivo (351_sunny, 648_pirouette…).
+ */
+const CUSTOM_DEX_FORM_SUFFIX = {
+    351: { 1: 'sunny', 2: 'rainy', 3: 'snowy' },
+    648: { 1: 'pirouette' },
+    741: { 1: 'pompom', 2: 'pau', 3: 'sensu' },
+    745: { 1: 'midnight' },
+    800: { 1: 'ultra', 2: 'ultra', 3: 'ultra' }
+};
+
+function getCustomDexGroupKey(pokemon) {
+    const dex = pokemon.species;
+    if (!dex && dex !== 0) return null;
+    const form = pokemon.form || 0;
+
+    // Minior: formas core suelen ser form >= 7
+    if (dex === 774 && form >= 7) return '774_core';
+
+    const mapped = CUSTOM_DEX_FORM_SUFFIX[dex]?.[form];
+    if (mapped) return `${dex}_${mapped}`;
+
+    return String(dex);
+}
+
+function getCustomDexVariants(pokemon, packId = null) {
+    const pack = packId || getCustomSpritePack(config.spriteType);
+    const index = customDexIndexByPack.get(pack);
+    if (!index) return [];
+
+    const groupKey = getCustomDexGroupKey(pokemon);
+    if (groupKey == null) return [];
+
+    let variants = index[groupKey] || index[String(groupKey).toLowerCase()] || [];
+    // Si la forma mapeada no tiene archivos, usar el grupo base del dex
+    if (!variants.length && String(groupKey).includes('_')) {
+        const baseDex = String(pokemon.species);
+        variants = index[baseDex] || [];
+    }
+    return variants;
+}
+
+function customDexChoiceCacheKey(pokemon, packId = null) {
+    const pack = packId || getCustomSpritePack(config.spriteType);
+    const group = getCustomDexGroupKey(pokemon);
+    const slot = pokemon.slot != null ? pokemon.slot : 'x';
+    return `${pack}|${slot}|${group}`;
+}
+
+/** Elige (y cachea) un basename aleatorio de Custom/ para este Pokémon. */
+function pickCustomDexVariant(pokemon, { reroll = false } = {}) {
+    const pack = getCustomSpritePack(config.spriteType);
+    const variants = getCustomDexVariants(pokemon, pack);
+    if (!variants.length) return null;
+
+    const key = customDexChoiceCacheKey(pokemon, pack);
+    if (!reroll && customDexChoiceCache.has(key)) {
+        const cached = customDexChoiceCache.get(key);
+        if (variants.includes(cached)) return cached;
+    }
+
+    let choice;
+    if (variants.length === 1) {
+        choice = variants[0];
+    } else if (reroll && customDexChoiceCache.has(key)) {
+        const prev = customDexChoiceCache.get(key);
+        const others = variants.filter(v => v !== prev);
+        choice = others.length
+            ? others[Math.floor(Math.random() * others.length)]
+            : variants[Math.floor(Math.random() * variants.length)];
+    } else {
+        choice = variants[Math.floor(Math.random() * variants.length)];
+    }
+
+    customDexChoiceCache.set(key, choice);
+    return choice;
+}
+
+async function loadCustomDexIndex(packId) {
+    if (!packId || customDexIndexByPack.has(packId)) return customDexIndexByPack.get(packId) || null;
+    try {
+        const res = await fetch(`/api/custom-sprites/custom-index?pack=${encodeURIComponent(packId)}`);
+        if (!res.ok) {
+            customDexIndexByPack.set(packId, {});
+            return {};
+        }
+        const data = await res.json() || {};
+        customDexIndexByPack.set(packId, data);
+        return data;
+    } catch (e) {
+        console.warn('[Sprites] No se pudo cargar índice Custom/', packId, e);
+        customDexIndexByPack.set(packId, {});
+        return {};
+    }
+}
+
+async function ensureCustomDexIndexForType(typeKey = config.spriteType) {
+    if (!isCustomDexSpritePack(typeKey)) return;
+    await loadCustomDexIndex(getCustomSpritePack(typeKey));
+}
+
+/** Prioridad: Custom/ (aleatorio) → Front shiny/Front; forma → base */
 function buildCustomSpriteUrls(pokemon) {
     const shiny = !!pokemon.isShiny;
+    const pack = getCustomSpritePack(config.spriteType);
+    const urls = [];
+
+    if (packHasCustomDexFolder(pack)) {
+        const chosen = pickCustomDexVariant(pokemon);
+        if (chosen) urls.push(buildCustomSpritePath(chosen, 'Custom', pack));
+    }
+
     const variants = buildCustomSpriteVariants(pokemon);
     const folders = shiny ? ['Front shiny', 'Front'] : ['Front'];
-    const urls = [];
     for (const folder of folders) {
         for (const variant of variants) {
-            urls.push(buildCustomSpritePath(variant, folder));
+            urls.push(buildCustomSpritePath(variant, folder, pack));
         }
     }
     return [...new Set(urls)];
@@ -2416,6 +2548,16 @@ function createPokemonCard(pokemon) {
             html += `<img src="${itemUrl}" alt="${escapeHtml(itemLabel)}" title="${escapeHtml(itemLabel)}" class="${itemClass}" loading="lazy" onerror="this.style.display='none'">`;
         }
     }
+    const showCustomReroll = !isOBSMode()
+        && isCustomDexSpritePack(config.spriteType)
+        && getCustomDexVariants(pokemon).length > 1;
+    if (showCustomReroll) {
+        html += `<button type="button" class="custom-sprite-reroll" title="Otro sprite aleatorio"`
+            + ` aria-label="Otro sprite aleatorio"`
+            + ` data-slot="${pokemon.slot ?? ''}"`
+            + ` data-species="${pokemon.species ?? ''}"`
+            + ` data-form="${pokemon.form || 0}">↻</button>`;
+    }
     html += `</div>`;
 
     if (config.showNickname) html += `<span class="${nameClass}">${escapeHtml(displayName)}</span>`;
@@ -2443,6 +2585,37 @@ function renderTeam(data) {
     }
     c.innerHTML = team.map(p => createPokemonCard(p)).join('');
     setupAllSpriteSheets();
+}
+
+function findTeamPokemonForReroll(btn) {
+    const slot = parseInt(btn.dataset.slot, 10);
+    const species = parseInt(btn.dataset.species, 10);
+    const form = parseInt(btn.dataset.form, 10) || 0;
+    const team = currentTeam?.team || [];
+    return team.find(p =>
+        (Number.isFinite(slot) ? p.slot === slot : true)
+        && p.species === species
+        && (p.form || 0) === form
+    ) || null;
+}
+
+function rerollCustomDexSprite(pokemon) {
+    if (!pokemon || !isCustomDexSpritePack(config.spriteType)) return;
+    pickCustomDexVariant(pokemon, { reroll: true });
+    if (currentTeam && shouldShowTeam()) renderTeam(currentTeam);
+}
+
+function setupCustomDexRerollListener() {
+    const team = document.getElementById('team');
+    if (!team || team.dataset.customRerollBound) return;
+    team.dataset.customRerollBound = '1';
+    team.addEventListener('click', e => {
+        const btn = e.target.closest('.custom-sprite-reroll');
+        if (!btn) return;
+        e.preventDefault();
+        const pokemon = findTeamPokemonForReroll(btn);
+        if (pokemon) rerollCustomDexSprite(pokemon);
+    });
 }
 
 const HEART_ICONS = {
@@ -2824,6 +2997,8 @@ async function updateOverlay() {
             await resolvePmdPortraits(t.team);
         } else if (type.source === 'tcgdex' && t?.team?.length) {
             await resolveTcgdexCards(t.team);
+        } else if (isCustomDexSpritePack(config.spriteType) && t?.team?.length) {
+            await ensureCustomDexIndexForType(config.spriteType);
         }
         renderTeam(t);
     }
@@ -2839,6 +3014,8 @@ async function updateOverlay() {
             await withSpriteTypeAsync(config.cemeterySpriteType, async () => {
                 await resolveTcgdexCards(t.cemetery);
             });
+        } else if (isCustomDexSpritePack(config.cemeterySpriteType)) {
+            await ensureCustomDexIndexForType(config.cemeterySpriteType);
         }
     }
     renderCemetery(t);
@@ -2852,7 +3029,12 @@ async function init() {
     loadConfig();
     await loadCustomFonts();
     await loadCustomSpritePacks();
-    if (!isOBSMode()) setupConfigListeners();
+    await ensureCustomDexIndexForType(config.spriteType);
+    await ensureCustomDexIndexForType(config.cemeterySpriteType);
+    if (!isOBSMode()) {
+        setupConfigListeners();
+        setupCustomDexRerollListener();
+    }
     applyConfig();
     await updateOverlay();
     setInterval(updateOverlay, REFRESH_INTERVAL);
