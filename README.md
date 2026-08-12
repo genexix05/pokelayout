@@ -71,7 +71,7 @@ Desde la pestaña **OBS** puedes copiar URLs adicionales:
 - Sprites oficiales, packs custom (variantes aleatorias en `Custom/` con reroll en preview) y arte **TCG** ([TCGdex](https://tcgdex.dev/es/assets): carta completa o artwork recortable)
 - Fuentes, colores, contornos y sombras
 - Indicador shiny y Pokémon debilitados en blanco y negro
-- Compatible con juegos oficiales, romhacks (p. ej. Luminescent Platinum) y fan games Essentials
+- Compatible con juegos oficiales, romhacks (p. ej. Luminescent Platinum) y fan games Essentials (Pokemon Añil)
 
 ## Juegos compatibles
 
