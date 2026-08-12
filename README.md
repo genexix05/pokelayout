@@ -40,29 +40,36 @@ Formatos habituales: `main`, `backup`, `.sav`, `.dsv`, `.bin`, `.rxdata`, `.rvda
 ### 2. Personalizar el overlay
 
 1. Abre `http://localhost:5051` en el navegador
-2. Elige layout, sprites, colores, fuentes, etc.
-3. Pulsa **Copiar** para obtener la URL del overlay
+2. Configura en las pestañas **General**, **Apariencia**, **Nuzlocke** y **OBS**
+3. En **OBS**, copia las URLs que necesites (equipo, vidas, slots, etc.)
 
 ### 3. Añadir a OBS
 
 1. Añade una fuente → **Navegador (Browser Source)**
-2. Pega la URL copiada
+2. Pega la URL del equipo (u otra vista)
 3. Tamaño orientativo: **400×100** (horizontal) o **150×400** (vertical)
 4. Activa **Actualizar navegador cuando la escena se active**
 
-#### Animación de muerte (opcional)
+#### Otras fuentes (opcionales)
 
-Si activas **Animación de muerte** en la configuración:
+Desde la pestaña **OBS** puedes copiar URLs adicionales:
 
-1. Copia la URL de animación de muerte
-2. Añade otra Browser Source a pantalla completa (por ejemplo 1920×1080)
-3. Quedará transparente hasta que un Pokémon caiga a 0 HP al guardar
+| Vista | Uso |
+|-------|-----|
+| Vidas (`?obs&view=lives`) | Contador de vidas del nuzlocke (número o corazones) |
+| URLs por Pokémon (slots 1–6) | Un Browser Source por hueco del equipo |
+| Animación de muerte | Pantalla completa; transparente hasta que un Pokémon caiga a 0 HP |
+| Medallas / cementerio | Si ya las usabas en tu setup |
 
 ## Qué incluye
 
 - Actualización automática al guardar la partida
 - Layouts horizontal, vertical y en cuadrícula
-- Muchos estilos de sprite, fuentes, colores, contornos y sombras
+- Panel de configuración por pestañas (General, Apariencia, Nuzlocke, OBS)
+- Contador de vidas nuzlocke (número o corazones, estilo y tipografía propios)
+- Barra de HP, objetos equipados y nivel con estilo independiente
+- Sprites oficiales, packs custom (variantes aleatorias en `Custom/` con reroll en preview) y arte **TCG** ([TCGdex](https://tcgdex.dev/es/assets): carta completa o artwork recortable)
+- Fuentes, colores, contornos y sombras
 - Indicador shiny y Pokémon debilitados en blanco y negro
 - Compatible con juegos oficiales, romhacks (p. ej. Luminescent Platinum) y fan games Essentials
 
@@ -80,4 +87,4 @@ Solo lectura: el programa no modifica tu save. Aun así, conviene hacer backup.
 
 ## Créditos
 
-[PKHeX](https://github.com/kwsch/PKHeX) · [PKLumiHex](https://github.com/TalonSabre/PKLumiHex) · [PokeAPI Sprites](https://github.com/PokeAPI/sprites) · [PMD Collab](https://pmdcollab.org/)
+[PKHeX](https://github.com/kwsch/PKHeX) · [PKLumiHex](https://github.com/TalonSabre/PKLumiHex) · [PokeAPI Sprites](https://github.com/PokeAPI/sprites) · [PMD Collab](https://pmdcollab.org/) · [TCGdex](https://tcgdex.dev/)
