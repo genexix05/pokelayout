@@ -328,19 +328,21 @@ public class SaveFileService
         List<object?> objects,
         Dictionary<string, object?> player)
     {
-        // v19+: storage en el hash raíz; pre-v19: objeto PokemonStorage suelto o en player
+        // v19+: storage en el hash raíz (Añil usa storage_system); pre-v19: objeto suelto o en player
         foreach (var obj in objects)
         {
             if (obj is Dictionary<string, object?> root)
             {
-                var fromRoot = TryGetBoxesFromStorage(GetRaw(root, "storage")
+                var fromRoot = TryGetBoxesFromStorage(GetRaw(root, "storage_system")
+                    ?? GetRaw(root, "storage")
                     ?? GetRaw(root, "pokemon_storage")
                     ?? GetRaw(root, "pc"));
                 if (fromRoot != null) return fromRoot;
             }
         }
 
-        var fromPlayer = TryGetBoxesFromStorage(GetRaw(player, "storage")
+        var fromPlayer = TryGetBoxesFromStorage(GetRaw(player, "storage_system")
+            ?? GetRaw(player, "storage")
             ?? GetRaw(player, "pokemon_storage")
             ?? GetRaw(player, "pc"));
         if (fromPlayer != null) return fromPlayer;
