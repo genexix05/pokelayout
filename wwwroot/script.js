@@ -872,10 +872,11 @@ function buildImgErrorHandler(fallbackUrl, fallback2) {
 }
 
 function buildChainedImgErrorHandler(urls) {
-    const safe = (urls || []).filter(Boolean).map(u => u.replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+    // Comillas simples: el handler va en onerror="..." y JSON.stringify rompería el atributo HTML.
+    const safe = (urls || []).filter(Boolean).map(u => String(u).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
     if (!safe.length) return `this.onerror=null;this.src='${FALLBACK_SPRITE}';`;
-    const json = JSON.stringify(safe);
-    return `var u=${json};var i=+(this.dataset.ci||0);if(i<u.length){this.dataset.ci=i+1;this.src=u[i];}else{this.onerror=null;}`;
+    const arr = '[' + safe.map(u => `'${u}'`).join(',') + ']';
+    return `var u=${arr};var i=+(this.dataset.ci||0);if(i<u.length){this.dataset.ci=i+1;this.src=u[i];}else{this.onerror=null;}`;
 }
 
 function setupSpriteSheet(img) {

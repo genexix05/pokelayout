@@ -421,12 +421,16 @@ public class SaveFileService
 
         // Solo pre-v19 (species = int): el ID puede chocar con la dex nacional (Pokémon Z).
         // v19+ ya trae símbolo (CHARMANDER); un @name distinto es mote, no especie custom.
+        // Si @name ≠ oficial: puede ser custom (CEFIREON) o mote (Salvador). Solo es custom
+        // si existe un sprite Front/ con ese nombre; si no, es mote de la especie del dex.
         var speciesIsNumericId = IsNumericSpeciesKey(speciesKey);
         var saveName = GetString(pk, "name");
+        var saveNameKey = NormalizeSpeciesKey(saveName?.Replace(' ', '_'));
         var isFangameCustom = speciesIsNumericId &&
                               !string.IsNullOrWhiteSpace(saveName) &&
                               !NamesMatch(saveName, officialName) &&
-                              !NamesMatch(saveName, officialKey);
+                              !NamesMatch(saveName, officialKey) &&
+                              CustomFrontSpriteExists(saveNameKey);
 
         string speciesName;
         string keyForSprites;
@@ -507,6 +511,80 @@ public class SaveFileService
 
     private static bool IsNumericSpeciesKey(string? key)
         => !string.IsNullOrEmpty(key) && key.All(char.IsDigit);
+
+    private static HashSet<string>? _customFrontSpriteKeys;
+    private static string? _customFrontSpriteRoot;
+
+    /// <summary>
+    /// True si custom-sprites/*/Front (o Front shiny) tiene un PNG/GIF con ese basename
+    /// (p. ej. CEFIREON). Sirve para distinguir customs pre-v19 de motes de oficiales.
+    /// </summary>
+    private static bool CustomFrontSpriteExists(string? speciesKey)
+    {
+        if (string.IsNullOrEmpty(speciesKey))
+            return false;
+
+        var root = ResolveCustomSpritesDirectory();
+        if (string.IsNullOrEmpty(root))
+            return false;
+
+        if (_customFrontSpriteKeys == null ||
+            !string.Equals(_customFrontSpriteRoot, root, StringComparison.OrdinalIgnoreCase))
+        {
+            _customFrontSpriteRoot = root;
+            _customFrontSpriteKeys = ScanCustomFrontSpriteKeys(root);
+        }
+
+        return _customFrontSpriteKeys.Contains(speciesKey);
+    }
+
+    private static string? ResolveCustomSpritesDirectory()
+    {
+        var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        var dir = Path.Combine(baseDir, "custom-sprites");
+        if (Directory.Exists(dir) && Directory.EnumerateFileSystemEntries(dir).Any())
+            return Path.GetFullPath(dir);
+
+        var devDir = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "custom-sprites"));
+        if (Directory.Exists(devDir))
+            return devDir;
+
+        return Directory.Exists(dir) ? Path.GetFullPath(dir) : null;
+    }
+
+    private static HashSet<string> ScanCustomFrontSpriteKeys(string root)
+    {
+        var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            foreach (var packDir in Directory.GetDirectories(root))
+            {
+                foreach (var folderName in new[] { "Front", "Front shiny" })
+                {
+                    var front = Path.Combine(packDir, folderName);
+                    if (!Directory.Exists(front))
+                        continue;
+
+                    foreach (var file in Directory.EnumerateFiles(front))
+                    {
+                        var ext = Path.GetExtension(file);
+                        if (ext is not (".png" or ".gif" or ".webp"))
+                            continue;
+                        var name = Path.GetFileNameWithoutExtension(file);
+                        if (string.IsNullOrEmpty(name))
+                            continue;
+                        keys.Add(NormalizeSpeciesKey(name));
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SaveFileService] No se pudo indexar sprites Front/: {ex.Message}");
+        }
+
+        return keys;
+    }
 
     /// <summary>
     /// Dex nacional: int (pre-v19) o símbolo/string Essentials (v19+).

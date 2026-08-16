@@ -104,7 +104,7 @@ Fan games hechos con Essentials (`.rxdata`, `.rvdata`, `.rvdata2`). Hay **muchí
 | Pokémon Añil          | Pokémon Z                                    |
 
 
-***Sobre el mote en Essentials antiguos (pre-v19):** en esos saves la especie custom se identifica por el **nombre** del Pokémon. Si no le pones mote, el sprite custom (p. ej. `CEFIREON` en packs tipo Gen V Animado) se resuelve bien. Si le pones mote a un Pokémon **custom**, el save ya no guarda el nombre de la especie y el sprite puede fallar o mostrar uno incorrecto. Los oficiales con mote siguen yendo por número de dex.
+***Sobre el mote en Essentials antiguos (pre-v19):** en esos saves no hay flag de mote: solo `@name`. Si el nombre no coincide con la especie del dex **y** existe un sprite `Front/` con ese nombre (p. ej. `CEFIREON`), se trata como custom. Si no hay sprite (p. ej. mote `Salvador` en un Lopunny), se usa el número de dex. Si le pones mote a un Pokémon **custom**, el save ya no guarda el nombre de la especie y el sprite puede fallar o mostrar uno incorrecto.
 
 ++***Solo lectura: el programa no modifica tu save. Aun así, conviene hacer backup***++.
 
