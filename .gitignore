@@ -9,6 +9,7 @@ release/
 .vs/
 *.user
 *.suo
+.vscode/
 
 # Rider
 .idea/
