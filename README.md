@@ -9,7 +9,6 @@ Overlay de equipo Pokémon para OBS: muestra tu equipo en tiempo real mientras j
 - Windows 10/11 (64 bits)
 - Conexión a internet (para cargar sprites)
 
-No hace falta instalar .NET: el release ya incluye todo.
 
 ## Descarga
 
