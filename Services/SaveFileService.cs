@@ -8,6 +8,11 @@ public class PokemonData
     public int Species { get; set; }
     public string SpeciesName { get; set; } = "";
     public string SpeciesKey { get; set; } = "";
+    /// <summary>
+    /// Clave Front/ del nombre oficial del dex cuando SpeciesKey es un custom Essentials
+    /// (p. ej. HALCOMBATE vs KORAIDON). Vacío si no aplica.
+    /// </summary>
+    public string DexSpeciesKey { get; set; } = "";
     public string Nickname { get; set; } = "";
     public bool HasNickname { get; set; }
     public int Level { get; set; }
@@ -265,10 +270,17 @@ public class SaveFileService
         }
         else
         {
-            // pre-v19: primer objeto suele ser Trainer / Player con @party
+            // pre-v19: varios dumps Marshal; el primero suele ser PokeBattle_Trainer con @party
             player = objects
                 .OfType<Dictionary<string, object?>>()
                 .FirstOrDefault(o => o.ContainsKey("party"));
+            if (player != null)
+            {
+                var cls = player.GetValueOrDefault("__class__")?.ToString() ?? "";
+                gameVersion = cls.Contains("PokeBattle", StringComparison.OrdinalIgnoreCase)
+                    ? "Essentials (pre-v19)"
+                    : "Essentials (legacy)";
+            }
         }
 
         if (player == null)
@@ -395,42 +407,82 @@ public class SaveFileService
         if (raw is not Dictionary<string, object?> pk)
             return null;
 
-        var speciesKey = GetString(pk, "species");
-        if (string.IsNullOrEmpty(speciesKey))
+        // v19+: species = símbolo ("CHARMANDER"); pre-v19: dex nacional numérico (6, 658, …)
+        var speciesId = ResolveEssentialsSpeciesId(GetRaw(pk, "species"), out var speciesKey);
+        if (speciesId <= 0 && string.IsNullOrEmpty(speciesKey))
             return null;
-
-        var speciesId = EssentialsSpeciesMap.Resolve(speciesKey);
         if (speciesId == 0)
             Console.WriteLine($"[SaveFileService] Especie Essentials desconocida: {speciesKey}");
 
-        var speciesName = EssentialsSpeciesMap.GetDisplayName(speciesId, speciesKey);
-        var nickname = GetString(pk, "name");
-        var hasNickname = !string.IsNullOrWhiteSpace(nickname) &&
-                          !string.Equals(nickname, speciesName, StringComparison.OrdinalIgnoreCase) &&
-                          !string.Equals(nickname, speciesKey, StringComparison.OrdinalIgnoreCase);
+        var officialName = EssentialsSpeciesMap.GetDisplayName(speciesId, speciesKey);
+        var officialKey = speciesId > 0
+            ? NormalizeSpeciesKey(officialName.Replace(' ', '_'))
+            : NormalizeSpeciesKey(speciesKey);
 
-        var isShiny = GetBool(pk, "shiny") || GetBool(pk, "super_shiny");
+        // Solo pre-v19 (species = int): el ID puede chocar con la dex nacional (Pokémon Z).
+        // v19+ ya trae símbolo (CHARMANDER); un @name distinto es mote, no especie custom.
+        var speciesIsNumericId = IsNumericSpeciesKey(speciesKey);
+        var saveName = GetString(pk, "name");
+        var isFangameCustom = speciesIsNumericId &&
+                              !string.IsNullOrWhiteSpace(saveName) &&
+                              !NamesMatch(saveName, officialName) &&
+                              !NamesMatch(saveName, officialKey);
+
+        string speciesName;
+        string keyForSprites;
+        string dexSpeciesKey;
+        bool hasNickname;
+        string nickname;
+
+        if (isFangameCustom)
+        {
+            speciesName = saveName!.Trim();
+            keyForSprites = NormalizeSpeciesKey(speciesName.Replace(' ', '_'));
+            dexSpeciesKey = officialKey;
+            hasNickname = false;
+            nickname = speciesName;
+        }
+        else
+        {
+            speciesName = officialName;
+            keyForSprites = officialKey;
+            dexSpeciesKey = "";
+            hasNickname = !string.IsNullOrWhiteSpace(saveName) &&
+                          !NamesMatch(saveName, speciesName) &&
+                          !NamesMatch(saveName, speciesKey) &&
+                          !NamesMatch(saveName, officialKey);
+            nickname = hasNickname ? saveName!.Trim() : speciesName;
+        }
+
+        // pre-v19: @shinyflag; v19+: @shiny / @super_shiny
+        var isShiny = GetBool(pk, "shiny") || GetBool(pk, "super_shiny") || GetBool(pk, "shinyflag");
         var form = GetInt(pk, "form");
         var level = GetInt(pk, "level");
+        // pre-v19 no guarda @level; se calcula desde @exp + curva de crecimiento
+        if (level <= 0)
+            level = LevelFromExp(speciesId, form, GetUInt(pk, "exp"));
+
         var hp = GetInt(pk, "hp");
         var totalHp = GetInt(pk, "totalhp");
         if (totalHp <= 0) totalHp = Math.Max(hp, 1);
 
+        // pre-v19: @eggsteps; v19+: @steps_to_hatch
         var stepsToHatch = GetInt(pk, "steps_to_hatch");
+        if (stepsToHatch <= 0)
+            stepsToHatch = GetInt(pk, "eggsteps");
         var isEgg = stepsToHatch > 0;
 
-        var gender = GetInt(pk, "gender");
-        if (gender is < 0 or > 2) gender = 2;
-
-        var item = FormatEssentialsSymbol(GetRaw(pk, "item"));
+        var gender = ResolveEssentialsGender(pk, speciesId);
+        var item = FormatEssentialsItem(GetRaw(pk, "item"));
 
         return new PokemonData
         {
             Slot = slot,
             Species = speciesId,
             SpeciesName = speciesName,
-            SpeciesKey = NormalizeSpeciesKey(speciesKey),
-            Nickname = hasNickname ? nickname! : speciesName,
+            SpeciesKey = keyForSprites,
+            DexSpeciesKey = dexSpeciesKey,
+            Nickname = nickname,
             HasNickname = hasNickname,
             Level = level,
             IsShiny = isShiny,
@@ -442,6 +494,115 @@ public class SaveFileService
             HeldItem = item,
             SpriteUrl = GetSpriteUrl(speciesId, isShiny)
         };
+    }
+
+    private static bool NamesMatch(string? a, string? b)
+    {
+        if (string.IsNullOrWhiteSpace(a) || string.IsNullOrWhiteSpace(b))
+            return false;
+        var na = NormalizeSpeciesKey(a.Replace(' ', '_'));
+        var nb = NormalizeSpeciesKey(b.Replace(' ', '_'));
+        return string.Equals(na, nb, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsNumericSpeciesKey(string? key)
+        => !string.IsNullOrEmpty(key) && key.All(char.IsDigit);
+
+    /// <summary>
+    /// Dex nacional: int (pre-v19) o símbolo/string Essentials (v19+).
+    /// </summary>
+    private static int ResolveEssentialsSpeciesId(object? raw, out string speciesKey)
+    {
+        speciesKey = "";
+        if (raw == null)
+            return 0;
+
+        if (raw is int i && i > 0)
+        {
+            speciesKey = i.ToString();
+            return i;
+        }
+
+        if (raw is long l && l > 0 && l < 10_000)
+        {
+            speciesKey = l.ToString();
+            return (int)l;
+        }
+
+        var s = raw.ToString();
+        if (string.IsNullOrWhiteSpace(s))
+            return 0;
+
+        speciesKey = s;
+        if (int.TryParse(s, out var n) && n > 0)
+            return n;
+
+        return EssentialsSpeciesMap.Resolve(s);
+    }
+
+    private static int LevelFromExp(int speciesId, int form, uint exp)
+    {
+        if (speciesId <= 0 || exp == 0)
+            return exp > 0 ? 1 : 0;
+
+        try
+        {
+            var pi = PersonalTable.SV.GetFormEntry((ushort)speciesId, (byte)Math.Clamp(form, 0, 255));
+            return Experience.GetLevel(exp, pi.EXPGrowth);
+        }
+        catch
+        {
+            // Medium Fast (crecimiento 0) como aproximación si no hay personal data
+            try { return Experience.GetLevel(exp, 0); }
+            catch { return 1; }
+        }
+    }
+
+    private static int ResolveEssentialsGender(Dictionary<string, object?> pk, int speciesId)
+    {
+        if (pk.ContainsKey("gender"))
+        {
+            var g = GetInt(pk, "gender");
+            if (g is >= 0 and <= 2)
+                return g;
+        }
+
+        // pre-v19: a veces @genderflag; si no, ratio + personalID
+        if (pk.ContainsKey("genderflag"))
+        {
+            var g = GetInt(pk, "genderflag");
+            if (g is >= 0 and <= 2)
+                return g;
+        }
+
+        if (speciesId <= 0)
+            return 2;
+
+        try
+        {
+            var pi = PersonalTable.SV[(ushort)speciesId];
+            var ratio = pi.Gender;
+            if (ratio == 255) return 2; // sin género
+            if (ratio == 254) return 1; // solo ♀
+            if (ratio == 0) return 0;   // solo ♂
+            var pid = GetUInt(pk, "personalID");
+            return (pid & 0xFF) < ratio ? 1 : 0;
+        }
+        catch
+        {
+            return 2;
+        }
+    }
+
+    private static string FormatEssentialsItem(object? value)
+    {
+        if (value == null) return "";
+        // pre-v19: ID numérico de objeto
+        if (value is int id)
+            return id > 0 ? GetItemName(id) : "";
+        if (value is long lid && lid > 0 && lid < 10_000)
+            return GetItemName((int)lid);
+        return FormatEssentialsSymbol(value);
     }
 
     private static object? GetRaw(Dictionary<string, object?> obj, string key)
@@ -468,7 +629,24 @@ public class SaveFileService
             long l => (int)l,
             byte b => b,
             short s => s,
+            uint u => (int)u,
             string s when int.TryParse(s, out var n) => n,
+            _ => 0
+        };
+    }
+
+    private static uint GetUInt(Dictionary<string, object?> obj, string key)
+    {
+        if (!obj.TryGetValue(key, out var v) || v == null)
+            return 0;
+        return v switch
+        {
+            uint u => u,
+            int i => i < 0 ? 0 : (uint)i,
+            long l => l < 0 ? 0 : (uint)Math.Min(l, uint.MaxValue),
+            byte b => b,
+            short s => s < 0 ? 0u : (uint)s,
+            string s when uint.TryParse(s, out var n) => n,
             _ => 0
         };
     }

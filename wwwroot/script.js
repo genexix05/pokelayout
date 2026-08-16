@@ -2133,12 +2133,25 @@ function getCustomSpeciesKey(pokemon) {
     return normalizeSpeciesFileName(pokemon.speciesName);
 }
 
-/** Variantes de nombre: ZORUA, ZORUA_1 (forma del save) */
+/** Variantes de nombre: ZORUA, ZORUA_1 (forma del save); luego clave dex oficial si el custom falla */
 function buildCustomSpriteVariants(pokemon) {
-    const base = getCustomSpeciesKey(pokemon);
     const form = pokemon.form || 0;
-    if (form > 0) return [`${base}_${form}`, base];
-    return [base];
+    const bases = [];
+    const primary = getCustomSpeciesKey(pokemon);
+    if (primary) bases.push(primary);
+
+    // Essentials fangame: SpeciesKey = HALCOMBATE; DexSpeciesKey = KORAIDON (fallback Front/)
+    const dexKey = (pokemon.dexSpeciesKey || '')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '');
+    if (dexKey && dexKey !== primary) bases.push(dexKey);
+
+    const variants = [];
+    for (const base of bases) {
+        if (form > 0) variants.push(`${base}_${form}`);
+        variants.push(base);
+    }
+    return [...new Set(variants)];
 }
 
 function buildCustomSpritePath(variantName, folder, packId = null) {
