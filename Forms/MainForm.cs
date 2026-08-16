@@ -124,15 +124,18 @@ public class MainForm : Form
         versionLabel.Location = new Point(titleLabel.PreferredWidth + 8, 15);
 
         // Botón Abrir Save
+        var openSaveFont = new Font("Segoe UI Semibold", 11F);
+        const string openSaveText = "Abrir archivo de guardado";
+        var openSaveTextSize = TextRenderer.MeasureText(openSaveText, openSaveFont);
         _openSaveButton = new Button
         {
-            Text = "  Abrir archivo de guardado",
-            Size = new Size(200, 44),
+            Text = openSaveText,
+            Size = new Size(Math.Max(260, openSaveTextSize.Width + 28), 44),
             Location = new Point(30, 95),
             FlatStyle = FlatStyle.Flat,
             BackColor = _accent,
             ForeColor = Color.White,
-            Font = new Font("Segoe UI Semibold", 11F),
+            Font = openSaveFont,
             Cursor = Cursors.Hand,
             TextAlign = ContentAlignment.MiddleCenter
         };
@@ -146,7 +149,9 @@ public class MainForm : Form
             Text = "Sin archivo cargado",
             Font = new Font("Segoe UI", 9F),
             ForeColor = _textSecondary,
-            AutoSize = true,
+            AutoSize = false,
+            AutoEllipsis = true,
+            Size = new Size(440, 20),
             Location = new Point(32, 148)
         };
 
@@ -170,8 +175,11 @@ public class MainForm : Form
         {
             Text = "🌐",
             Font = new Font("Segoe UI", 16F),
-            AutoSize = true,
-            Location = new Point(15, 20)
+            AutoSize = false,
+            Size = new Size(32, 32),
+            Location = new Point(12, 19),
+            BackColor = Color.Transparent,
+            TextAlign = ContentAlignment.MiddleCenter
         };
 
         _serverLabel = new Label
@@ -180,7 +188,8 @@ public class MainForm : Form
             Font = new Font("Consolas", 12F),
             ForeColor = _success,
             AutoSize = true,
-            Location = new Point(50, 15)
+            BackColor = Color.Transparent,
+            Location = new Point(70, 15)
         };
 
         var serverHint = new Label
@@ -189,7 +198,8 @@ public class MainForm : Form
             Font = new Font("Segoe UI", 9F),
             ForeColor = _textSecondary,
             AutoSize = true,
-            Location = new Point(50, 40)
+            BackColor = Color.Transparent,
+            Location = new Point(70, 40)
         };
 
         _copyUrlButton = new Button
