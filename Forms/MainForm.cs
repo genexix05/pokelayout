@@ -525,6 +525,13 @@ public class MainForm : Form
                 return;
             }
 
+            if (path.StartsWith("/kahunas/", StringComparison.OrdinalIgnoreCase) &&
+                request.HttpMethod == "GET")
+            {
+                await ServeKahunaImageAsync(context, path["/kahunas/".Length..]);
+                return;
+            }
+
             if (path.Equals("/api/custom-sprites/packs", StringComparison.OrdinalIgnoreCase) &&
                 request.HttpMethod == "GET")
             {
@@ -730,26 +737,33 @@ public class MainForm : Form
         while (i < baseName.Length && char.IsDigit(baseName[i])) i++;
         if (i == 0) return null;
 
-        var dex = baseName[..i];
+        // Normalizar ceros a la izquierda (001.png → "1") para emparejar con species del save
+        var dexRaw = baseName[..i];
+        if (!int.TryParse(dexRaw, out var dexNum)) return null;
+        var dex = dexNum.ToString();
         var rest = baseName[i..];
 
-        // 25 / 25a / 25aa → grupo "25"
-        if (rest.Length == 0 || rest.All(char.IsLetter))
+        if (rest.Length == 0)
             return dex;
 
         // 351_sunny / 351_sunnya → grupo "351_sunny"
-        if (rest[0] != '_') return null;
-        var after = rest[1..];
-        foreach (var form in CustomDexFormNames.OrderByDescending(f => f.Length))
+        if (rest[0] == '_')
         {
-            if (after.Equals(form, StringComparison.Ordinal) ||
-                (after.StartsWith(form, StringComparison.Ordinal) && after[form.Length..].All(char.IsLetter)))
+            var after = rest[1..];
+            foreach (var form in CustomDexFormNames.OrderByDescending(f => f.Length))
             {
-                return $"{dex}_{form}";
+                if (after.Equals(form, StringComparison.Ordinal) ||
+                    (after.StartsWith(form, StringComparison.Ordinal) && after[form.Length..].All(char.IsLetter)))
+                {
+                    return $"{dex}_{form}";
+                }
             }
+
+            return null;
         }
 
-        return null;
+        // Sufijos libres: 25a, 001Winking, 025CostumeHo-Oh, 006MSX…
+        return dex;
     }
 
     /// <summary>
@@ -1016,6 +1030,45 @@ public class MainForm : Form
         };
         response.Headers.Add("Cache-Control", "public, max-age=3600");
         var bytes = await File.ReadAllBytesAsync(path);
+        response.ContentLength64 = bytes.Length;
+        await response.OutputStream.WriteAsync(bytes);
+    }
+
+    private static readonly HashSet<string> AllowedKahunaFiles = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "hala.png", "olivia.png", "nanu.png", "hapu.png"
+    };
+
+    private async Task ServeKahunaImageAsync(HttpListenerContext context, string fileName)
+    {
+        var response = context.Response;
+        fileName = Path.GetFileName(Uri.UnescapeDataString(fileName));
+        if (!AllowedKahunaFiles.Contains(fileName))
+        {
+            response.StatusCode = 404;
+            var err = Encoding.UTF8.GetBytes("Not Found");
+            response.ContentLength64 = err.Length;
+            await response.OutputStream.WriteAsync(err);
+            return;
+        }
+
+        var basePath = AppDomain.CurrentDomain.BaseDirectory;
+        var filePath = Path.Combine(basePath, "wwwroot", "kahunas", fileName);
+        if (!File.Exists(filePath))
+            filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "kahunas", fileName);
+
+        if (!File.Exists(filePath))
+        {
+            response.StatusCode = 404;
+            var err = Encoding.UTF8.GetBytes("Not Found");
+            response.ContentLength64 = err.Length;
+            await response.OutputStream.WriteAsync(err);
+            return;
+        }
+
+        response.ContentType = "image/png";
+        response.Headers.Add("Cache-Control", "public, max-age=86400");
+        var bytes = await File.ReadAllBytesAsync(filePath);
         response.ContentLength64 = bytes.Length;
         await response.OutputStream.WriteAsync(bytes);
     }

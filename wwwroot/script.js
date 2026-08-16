@@ -2211,7 +2211,35 @@ function getCustomDexVariants(pokemon, packId = null) {
         const baseDex = String(pokemon.species);
         variants = index[baseDex] || [];
     }
-    return variants;
+    return sortCustomDexVariants(variants, pokemon);
+}
+
+const CUSTOM_DEX_CHOICES_STORAGE_KEY = 'pokelayout-custom-dex-choices';
+
+function loadCustomDexChoicesFromStorage() {
+    try {
+        const raw = localStorage.getItem(CUSTOM_DEX_CHOICES_STORAGE_KEY);
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        if (!data || typeof data !== 'object') return;
+        for (const [key, value] of Object.entries(data)) {
+            if (typeof value === 'string' && value && !customDexChoiceCache.has(key)) {
+                customDexChoiceCache.set(key, value);
+            }
+        }
+    } catch (_) { /* ignore */ }
+}
+
+function persistCustomDexChoice(key, choice) {
+    if (!key || !choice) return;
+    customDexChoiceCache.set(key, choice);
+    try {
+        const raw = localStorage.getItem(CUSTOM_DEX_CHOICES_STORAGE_KEY);
+        const data = raw ? JSON.parse(raw) : {};
+        const map = data && typeof data === 'object' ? data : {};
+        map[key] = choice;
+        localStorage.setItem(CUSTOM_DEX_CHOICES_STORAGE_KEY, JSON.stringify(map));
+    } catch (_) { /* ignore */ }
 }
 
 function customDexChoiceCacheKey(pokemon, packId = null) {
@@ -2221,32 +2249,76 @@ function customDexChoiceCacheKey(pokemon, packId = null) {
     return `${pack}|${slot}|${group}`;
 }
 
-/** Elige (y cachea) un basename aleatorio de Custom/ para este Pokémon. */
-function pickCustomDexVariant(pokemon, { reroll = false } = {}) {
+function isBasicCustomDexVariant(basename, pokemon) {
+    if (!basename || !/^\d+$/.test(basename)) return false;
+    return parseInt(basename, 10) === Number(pokemon.species);
+}
+
+/** Sprite “base” del dex (001.png / 25.png); si no hay, el más corto del grupo. */
+function getBasicCustomDexVariant(variants, pokemon) {
+    if (!variants.length) return null;
+    const basics = variants.filter(v => isBasicCustomDexVariant(v, pokemon));
+    if (basics.length) {
+        return basics.sort((a, b) => a.length - b.length || a.localeCompare(b))[0];
+    }
+    const group = String(getCustomDexGroupKey(pokemon) || '');
+    if (group.includes('_')) {
+        const exact = variants.find(v => v.toLowerCase() === group.toLowerCase());
+        if (exact) return exact;
+    }
+    return [...variants].sort((a, b) => a.length - b.length || a.localeCompare(b))[0];
+}
+
+function sortCustomDexVariants(variants, pokemon) {
+    if (!variants.length) return [];
+    const basic = getBasicCustomDexVariant(variants, pokemon);
+    return [...variants].sort((a, b) => {
+        if (a === basic) return -1;
+        if (b === basic) return 1;
+        return a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true });
+    });
+}
+
+function formatCustomDexVariantLabel(basename, pokemon) {
+    if (!basename) return '';
+    if (isBasicCustomDexVariant(basename, pokemon)) return 'Base';
+    const dex = Number(pokemon.species);
+    const m = String(basename).match(/^0*(\d+)(.*)$/i);
+    if (m && parseInt(m[1], 10) === dex && m[2]) {
+        return m[2].replace(/([a-z])([A-Z])/g, '$1 $2');
+    }
+    const group = String(getCustomDexGroupKey(pokemon) || '');
+    if (group && String(basename).toLowerCase().startsWith(group.toLowerCase())) {
+        const rest = basename.slice(group.length);
+        return rest || 'Base';
+    }
+    return basename;
+}
+
+/**
+ * Elige (y recuerda) un basename de Custom/.
+ * Por defecto el sprite base; cycle ±1 recorre la rueda de variantes.
+ */
+function pickCustomDexVariant(pokemon, { cycle = 0 } = {}) {
     const pack = getCustomSpritePack(config.spriteType);
     const variants = getCustomDexVariants(pokemon, pack);
     if (!variants.length) return null;
 
     const key = customDexChoiceCacheKey(pokemon, pack);
-    if (!reroll && customDexChoiceCache.has(key)) {
+    let choice = null;
+
+    if (customDexChoiceCache.has(key)) {
         const cached = customDexChoiceCache.get(key);
-        if (variants.includes(cached)) return cached;
+        if (variants.includes(cached)) choice = cached;
+    }
+    if (!choice) choice = getBasicCustomDexVariant(variants, pokemon);
+
+    if (cycle !== 0 && variants.length > 1) {
+        const idx = Math.max(0, variants.indexOf(choice));
+        choice = variants[(idx + cycle + variants.length * 10) % variants.length];
     }
 
-    let choice;
-    if (variants.length === 1) {
-        choice = variants[0];
-    } else if (reroll && customDexChoiceCache.has(key)) {
-        const prev = customDexChoiceCache.get(key);
-        const others = variants.filter(v => v !== prev);
-        choice = others.length
-            ? others[Math.floor(Math.random() * others.length)]
-            : variants[Math.floor(Math.random() * variants.length)];
-    } else {
-        choice = variants[Math.floor(Math.random() * variants.length)];
-    }
-
-    customDexChoiceCache.set(key, choice);
+    persistCustomDexChoice(key, choice);
     return choice;
 }
 
@@ -2561,17 +2633,25 @@ function createPokemonCard(pokemon) {
             html += `<img src="${itemUrl}" alt="${escapeHtml(itemLabel)}" title="${escapeHtml(itemLabel)}" class="${itemClass}" loading="lazy" onerror="this.style.display='none'">`;
         }
     }
-    const showCustomReroll = !isOBSMode()
+    const showCustomWheel = !isOBSMode()
         && isCustomDexSpritePack(config.spriteType)
         && getCustomDexVariants(pokemon).length > 1;
-    if (showCustomReroll) {
-        html += `<button type="button" class="custom-sprite-reroll" title="Otro sprite aleatorio"`
-            + ` aria-label="Otro sprite aleatorio"`
+    html += `</div>`;
+
+    if (showCustomWheel) {
+        const chosen = pickCustomDexVariant(pokemon) || '';
+        const label = formatCustomDexVariantLabel(chosen, pokemon);
+        html += `<div class="custom-sprite-wheel"`
             + ` data-slot="${pokemon.slot ?? ''}"`
             + ` data-species="${pokemon.species ?? ''}"`
-            + ` data-form="${pokemon.form || 0}">↻</button>`;
+            + ` data-form="${pokemon.form || 0}">`
+            + `<button type="button" class="custom-sprite-wheel-btn" data-dir="-1"`
+            + ` title="Sprite anterior" aria-label="Sprite anterior">‹</button>`
+            + `<span class="custom-sprite-wheel-label" title="${escapeHtml(chosen)}">${escapeHtml(label)}</span>`
+            + `<button type="button" class="custom-sprite-wheel-btn" data-dir="1"`
+            + ` title="Sprite siguiente" aria-label="Sprite siguiente">›</button>`
+            + `</div>`;
     }
-    html += `</div>`;
 
     if (config.showNickname) html += `<span class="${nameClass}">${escapeHtml(displayName)}</span>`;
     if (config.showLevel && !levelInCorner) html += `<span class="${levelClass}">${escapeHtml(levelText)}</span>`;
@@ -2612,9 +2692,9 @@ function findTeamPokemonForReroll(btn) {
     ) || null;
 }
 
-function rerollCustomDexSprite(pokemon) {
+function cycleCustomDexSprite(pokemon, dir = 1) {
     if (!pokemon || !isCustomDexSpritePack(config.spriteType)) return;
-    pickCustomDexVariant(pokemon, { reroll: true });
+    pickCustomDexVariant(pokemon, { cycle: dir < 0 ? -1 : 1 });
     if (currentTeam && shouldShowTeam()) renderTeam(currentTeam);
 }
 
@@ -2623,11 +2703,13 @@ function setupCustomDexRerollListener() {
     if (!team || team.dataset.customRerollBound) return;
     team.dataset.customRerollBound = '1';
     team.addEventListener('click', e => {
-        const btn = e.target.closest('.custom-sprite-reroll');
+        const btn = e.target.closest('.custom-sprite-wheel-btn');
         if (!btn) return;
         e.preventDefault();
-        const pokemon = findTeamPokemonForReroll(btn);
-        if (pokemon) rerollCustomDexSprite(pokemon);
+        const wheel = btn.closest('.custom-sprite-wheel');
+        if (!wheel) return;
+        const pokemon = findTeamPokemonForReroll(wheel);
+        if (pokemon) cycleCustomDexSprite(pokemon, parseInt(btn.dataset.dir, 10) || 1);
     });
 }
 
@@ -2833,16 +2915,21 @@ function renderBadges(data) {
                 return config.badgeDimUnobtained;
             });
             if (!badges.length) return '';
+            const isKahuna = badges.some(b => b.cssClass === 'kahuna');
             const label = config.showBadgeLabels && set.region
                 ? `<span class="badge-set-label">${escapeHtml(set.region)}</span>`
                 : '';
             const items = badges.map(b => {
-                const cls = b.obtained ? 'badge-item' : 'badge-item unobtained';
-                const url = buildBadgeUrl(b.spriteId);
+                const extra = b.cssClass ? ` ${escapeHtml(b.cssClass)}` : '';
+                const cls = (b.obtained ? 'badge-item' : 'badge-item unobtained') + extra;
+                const url = b.imageUrl || buildBadgeUrl(b.spriteId);
                 const title = escapeHtml(b.name || '');
-                return `<span class="${cls}" title="${title}"><img src="${url}" alt="${title}" loading="lazy" onerror="this.style.opacity='0.15'"></span>`;
+                const accent = b.accent ? ` style="--kahuna-accent:${escapeHtml(b.accent)}"` : '';
+                return `<span class="${cls}" title="${title}"${accent}><img src="${url}" alt="${title}" loading="lazy" onerror="this.style.opacity='0.15'"></span>`;
             }).join('');
-            return `<div class="badge-set">${label}<div class="badge-row">${items}</div></div>`;
+            const rowCls = isKahuna ? 'badge-row kahuna-row' : 'badge-row';
+            const setCls = isKahuna ? 'badge-set kahuna-set' : 'badge-set';
+            return `<div class="${setCls}">${label}<div class="${rowCls}">${items}</div></div>`;
         })
         .filter(Boolean)
         .join('');
@@ -3040,6 +3127,7 @@ async function updateOverlay() {
 async function init() {
     if (isOBSMode()) document.body.classList.add('obs-mode');
     loadConfig();
+    loadCustomDexChoicesFromStorage();
     await loadCustomFonts();
     await loadCustomSpritePacks();
     await ensureCustomDexIndexForType(config.spriteType);

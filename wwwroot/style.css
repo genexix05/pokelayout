@@ -1010,6 +1010,7 @@ input[type="range"]::-webkit-slider-thumb {
     height: var(--badge-size);
     flex-shrink: 0;
     position: relative;
+    overflow: visible;
 }
 
 .badge-item img {
@@ -1027,6 +1028,52 @@ input[type="range"]::-webkit-slider-thumb {
 
 .badge-item.unobtained.hidden {
     display: none;
+}
+
+/* Kahunas (Alola): figuras sueltas con sombra, sin marcos ni recorte */
+.badge-set.kahuna-set {
+    gap: 2px;
+}
+
+.badge-row.kahuna-row {
+    gap: calc(var(--badge-size) * 0.28);
+    flex-wrap: nowrap;
+    align-items: flex-end;
+    overflow: visible;
+    border: none;
+    background: transparent;
+}
+
+.badge-item.kahuna {
+    width: calc(var(--badge-size) * 1.25);
+    height: auto;
+    border-radius: 0;
+    overflow: visible;
+    box-shadow: none;
+    background: transparent;
+    border: none;
+    position: relative;
+}
+
+.badge-item.kahuna img {
+    width: 100%;
+    height: auto;
+    max-height: none;
+    object-fit: contain;
+    object-position: center top;
+    display: block;
+    filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.55));
+    image-rendering: auto;
+}
+
+.badge-item.kahuna.unobtained {
+    filter: grayscale(1) brightness(0.65);
+    box-shadow: none;
+}
+
+.badge-item.kahuna.unobtained img {
+    opacity: 0.55;
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35));
 }
 
 .team-wrapper.bg-dark {
@@ -1141,16 +1188,24 @@ input[type="range"]::-webkit-slider-thumb {
     pointer-events: none;
 }
 
-/* Botón para rerollear variante Custom/ (solo panel de preview) */
-.custom-sprite-reroll {
-    position: absolute;
-    right: 0;
-    bottom: 0;
+/* Rueda de variantes Custom/ (Shuffle, Gen V, etc.; solo panel de preview) */
+.custom-sprite-wheel {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    max-width: calc(var(--sprite-size) + 24px);
+    margin-top: 2px;
     z-index: 5;
-    width: 22px;
-    height: 22px;
+    user-select: none;
+}
+
+.custom-sprite-wheel-btn {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
     padding: 0;
-    border: 1px solid rgba(255, 255, 255, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.28);
     border-radius: 6px;
     background: rgba(15, 23, 42, 0.72);
     color: #f8fafc;
@@ -1160,25 +1215,41 @@ input[type="range"]::-webkit-slider-thumb {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    opacity: 0.55;
-    transition: opacity 0.15s ease, background 0.15s ease, transform 0.15s ease;
+    opacity: 0.7;
+    transition: opacity 0.15s ease, background 0.15s ease, transform 0.12s ease;
 }
 
-.pokemon-card:hover .custom-sprite-reroll,
-.custom-sprite-reroll:focus-visible {
+.pokemon-card:hover .custom-sprite-wheel-btn,
+.custom-sprite-wheel-btn:focus-visible {
     opacity: 1;
 }
 
-.custom-sprite-reroll:hover {
+.custom-sprite-wheel-btn:hover {
     background: rgba(30, 41, 59, 0.92);
-    transform: rotate(-20deg);
 }
 
-.custom-sprite-reroll:active {
-    transform: rotate(-90deg);
+.custom-sprite-wheel-btn:active {
+    transform: scale(0.92);
 }
 
-body.obs-mode .custom-sprite-reroll {
+.custom-sprite-wheel-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 7.5rem;
+    padding: 0 2px;
+    color: rgba(248, 250, 252, 0.92);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+}
+
+body.obs-mode .custom-sprite-wheel {
     display: none !important;
 }
 

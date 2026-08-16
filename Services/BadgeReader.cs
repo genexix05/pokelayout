@@ -7,6 +7,12 @@ public class BadgeEntry
     public int SpriteId { get; set; }
     public string Name { get; set; } = "";
     public bool Obtained { get; set; }
+    /// <summary>URL local o absoluta; si hay valor, el frontend la usa en lugar de PokeAPI.</summary>
+    public string? ImageUrl { get; set; }
+    /// <summary>Clase CSS extra (p. ej. "kahuna").</summary>
+    public string? CssClass { get; set; }
+    /// <summary>Color de acento (anillo del portrait).</summary>
+    public string? Accent { get; set; }
 }
 
 public class BadgeSetData
@@ -42,6 +48,9 @@ public static class BadgeReader
         "Trio", "Básico", "Insecto", "Voltaje", "Quimera", "Jet", "Psique", "Legado"
     ];
 
+    // PokeAPI insertó Toxic (35) y Bolt (37) en Unova; las 8 medallas clásicas saltan esos índices.
+    private static readonly int[] UnovaSprites = [33, 34, 36, 38, 39, 40, 41, 42];
+
     private static readonly string[] Kalos =
     [
         "Bug", "Roca", "Planta", "Relámpago", "Psique", "Hielo", "Dragón", "Fada"
@@ -57,6 +66,10 @@ public static class BadgeReader
         "Isla", "Corona"
     ];
 
+    // IDs PokeAPI tras el rearrange de Unova (+2 desde Kalos en adelante).
+    // Kanto 1–8, Johto 9–16, Hoenn 17–24, Sinnoh 25–32,
+    // Unova 33–42, Kalos 43–50, Galar 51–58, Galar DLC 59–60,
+    // Dominantes 61–65, Team Star 66–69 (+ lucha sin sprite dedicado), gimnasios Paldea 70–77.
     private static readonly (uint Key, int SpriteId, string Name)[] PaldeaGyms =
     [
         (0x89306FE6, 70, "Insecto"),
@@ -71,20 +84,21 @@ public static class BadgeReader
 
     private static readonly (uint Key, int SpriteId, string Name)[] PaldeaTitans =
     [
-        (0xA6CDE603, 59, "Roca"),
-        (0xBDAC74B3, 60, "Tierra"),
-        (0x9C16DA94, 61, "Volador"),
-        (0x0D0602DE, 62, "Acero"),
-        (0xEC7361B7, 63, "Dragón"),
+        (0xA6CDE603, 61, "Roca"),
+        (0xBDAC74B3, 62, "Tierra"),
+        (0x9C16DA94, 63, "Volador"),
+        (0x0D0602DE, 64, "Acero"),
+        (0xEC7361B7, 65, "Dragón"),
     ];
 
     private static readonly (uint Key, int SpriteId, string Name)[] PaldeaStar =
     [
-        (0x6C29ACC5, 64, "Siniestro"),
-        (0x71DB2CEB, 65, "Veneno"),
-        (0xE1271327, 66, "Hada"),
-        (0x9C6FF7DD, 67, "Fuego"),
-        (0x2A3AC89A, 68, "Lucha"),
+        (0x6C29ACC5, 66, "Siniestro"),
+        (0x71DB2CEB, 67, "Veneno"),
+        (0xE1271327, 68, "Hada"),
+        (0x9C6FF7DD, 69, "Fuego"),
+        // PokeAPI solo tiene 4 emblemas Star (66–69); reutilizamos 69 para Lucha.
+        (0x2A3AC89A, 69, "Lucha"),
     ];
 
     public static List<BadgeSetData> Extract(SaveFile sav)
@@ -99,15 +113,58 @@ public static class BadgeReader
             SAV3 s3 => [FromBitmask("Hoenn", s3.Badges, 17, Hoenn)],
             SAV4HGSS s4h => ExtractHgss(s4h),
             SAV4 s4 => [FromBitmask("Sinnoh", s4.Badges, 25, Sinnoh)],
-            SAV5 s5 => [FromBitmask("Teselia", s5.Misc.Badges, 33, Unova)],
-            SAV6XY s6xy => [FromBitmask("Kalos", s6xy.Badges, 41, Kalos)],
-            SAV6AO s6ao => [FromBitmask("Kalos", s6ao.Badges, 41, Kalos)],
+            SAV5 s5 => [FromSprites("Teselia", s5.Misc.Badges, UnovaSprites, Unova)],
+            SAV6XY s6xy => [FromBitmask("Kalos", s6xy.Badges, 43, Kalos)],
+            // ORAS reutiliza el bitmask de Hoenn (no Kalos).
+            SAV6AO s6ao => [FromBitmask("Hoenn", s6ao.Badges, 17, Hoenn)],
+            SAV7SM s7sm => [ExtractAlolaKahunas(s7sm.Inventory)],
+            SAV7USUM s7u => [ExtractAlolaKahunas(s7u.Inventory)],
             SAV7b s7b => [ExtractLetsGo(s7b)],
             SAV8SWSH s8 => ExtractSwSh(s8),
             SAV8BS s8b => [ExtractBdsp(s8b)],
             SAV9SV s9 => ExtractSv(s9),
             _ => []
         };
+    }
+
+    // Cristales Z en la bolsa (ZCrystalKey). Los IDs held (782…) no se guardan en el pouch.
+    private static readonly (string File, string Name, string Accent, int ItemId)[] AlolaKahunas =
+    [
+        ("hala", "Hala", "#e8a838", 813),    // Fightinium Z — Melemele
+        ("olivia", "Mayla", "#c4785a", 819), // Rockium Z — Akala
+        ("nanu", "Denio", "#7060a0", 822),   // Darkinium Z — Ula'ula
+        ("hapu", "Hela", "#c9a227", 815),    // Groundium Z — Poni
+    ];
+
+    private static BadgeSetData ExtractAlolaKahunas(PlayerBag bag)
+    {
+        var owned = new HashSet<int>();
+        try
+        {
+            foreach (var item in bag.GetPouch(InventoryType.ZCrystals).Items)
+            {
+                if (item.Count > 0)
+                    owned.Add(item.Index);
+            }
+        }
+        catch
+        {
+            /* pouch no disponible */
+        }
+
+        var set = new BadgeSetData { Region = "Kahunas" };
+        foreach (var (file, name, accent, itemId) in AlolaKahunas)
+        {
+            set.Badges.Add(new BadgeEntry
+            {
+                Name = name,
+                Obtained = owned.Contains(itemId),
+                ImageUrl = $"/kahunas/{file}.png",
+                CssClass = "kahuna",
+                Accent = accent
+            });
+        }
+        return set;
     }
 
     public static List<BadgeSetData> ExtractEssentials(Dictionary<string, object?> player)
@@ -184,13 +241,13 @@ public static class BadgeReader
 
     private static List<BadgeSetData> ExtractSwSh(SAV8SWSH s8)
     {
-        var main = FromBitmask("Galar", s8.Badges, 49, Galar);
+        var main = FromBitmask("Galar", s8.Badges, 51, Galar);
         var sets = new List<BadgeSetData> { main };
 
         // Medallas extra (Isla de la Armadura / Corona) en bits altos si están presentes
         var extraMask = s8.Badges >> 8;
         if (extraMask != 0)
-            sets.Add(FromBitmask("Galar (DLC)", extraMask, 57, GalarExtra));
+            sets.Add(FromBitmask("Galar (DLC)", extraMask, 59, GalarExtra));
 
         return sets;
     }
@@ -247,6 +304,22 @@ public static class BadgeReader
             set.Badges.Add(new BadgeEntry
             {
                 SpriteId = startSpriteId + i,
+                Name = names[i],
+                Obtained = (bitmask & (1 << i)) != 0
+            });
+        }
+        return set;
+    }
+
+    private static BadgeSetData FromSprites(string region, int bitmask, int[] spriteIds, string[] names)
+    {
+        var set = new BadgeSetData { Region = region };
+        var count = Math.Min(spriteIds.Length, names.Length);
+        for (int i = 0; i < count; i++)
+        {
+            set.Badges.Add(new BadgeEntry
+            {
+                SpriteId = spriteIds[i],
                 Name = names[i],
                 Obtained = (bitmask & (1 << i)) != 0
             });
