@@ -2,7 +2,7 @@
 
 Overlay de equipo Pokémon para OBS: muestra tu equipo en tiempo real mientras juegas y streameas.
 
-[Demo PokeLayout](https://github.com/genexix05/pokelayout/blob/main/media/demo-essentials.gif)
+![Demo PokeLayout](https://github.com/genexix05/pokelayout/blob/main/media/demo-essentials.gif)
 
 ## Requisitos
 
