@@ -227,7 +227,10 @@ internal static class LumiSaveBridge
             if (!hasBox || boxCount <= 0)
                 return;
 
-            var lastBox = boxCount - 1;
+            var boxesUnlocked = Convert.ToInt32(savType.GetProperty("BoxesUnlocked")?.GetValue(sav) ?? -1);
+            var lastBox = SaveFileService.ResolveCemeteryBoxIndex(boxCount, boxesUnlocked);
+            if (lastBox < 0)
+                return;
             team.CemeteryBoxIndex = lastBox;
 
             var getBoxData = savType.GetMethod("GetBoxData", [typeof(int)]);

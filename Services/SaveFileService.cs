@@ -167,7 +167,9 @@ public class SaveFileService
             if (!sav.HasBox || sav.BoxCount <= 0)
                 return;
 
-            var lastBox = sav.BoxCount - 1;
+            // En ORAS/XY/etc. las cajas se desbloquean poco a poco: la "última caja"
+            // del nuzlocke es la última desbloqueada, no BoxCount-1 (p. ej. caja 31).
+            var lastBox = ResolveCemeteryBoxIndex(sav.BoxCount, sav.BoxesUnlocked);
             team.CemeteryBoxIndex = lastBox;
             var box = sav.GetBoxData(lastBox);
             for (int i = 0; i < box.Length; i++)
@@ -181,6 +183,19 @@ public class SaveFileService
         {
             Console.WriteLine($"[SaveFileService] No se pudo leer cementerio (última caja): {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Índice 0-based de la caja cementerio: última desbloqueada si el juego lo reporta,
+    /// si no la última del PC (BoxCount - 1).
+    /// </summary>
+    internal static int ResolveCemeteryBoxIndex(int boxCount, int boxesUnlocked)
+    {
+        if (boxCount <= 0)
+            return -1;
+        if (boxesUnlocked > 0)
+            return Math.Clamp(boxesUnlocked, 1, boxCount) - 1;
+        return boxCount - 1;
     }
 
     private static PokemonData BuildPokemonFromPkhex(PKM pk, int slot) => new()
