@@ -23,6 +23,8 @@ release/
 *.rvdata2
 _SmokeTest/
 _parse_rxdata.py
+mainpkmnrubiomega/
+main/
 
 # User-imported fonts (runtime)
 custom-fonts/
